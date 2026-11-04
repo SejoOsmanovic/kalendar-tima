@@ -52,6 +52,10 @@ class RoleSelection(forms.Form):
     job_role = forms.ModelChoiceField(label="Job role", queryset=JobRole.objects.all(), empty_label="Select a role")
 
 
+class ApprovalScope(forms.Form):
+    roles = forms.ModelMultipleChoiceField(queryset=JobRole.objects.all(), required=False)
+
+
 class Member(RoleSelection):
     name = forms.CharField(label="Full name", max_length=150)
     username = forms.RegexField(label="Username", regex=r"^[\w.@+-]+$", max_length=150)

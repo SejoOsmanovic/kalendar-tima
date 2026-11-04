@@ -107,6 +107,32 @@ class TeamFlow(TestCase):
         self.assertEqual(item.status, "withdrawn")
         self.assertFalse(Day.objects.exists())
 
+    def test_role_approver(self):
+        ana, marko, iva = [User.objects.get(username=n) for n in ("Ana","Marko","Iva")]
+        editor = JobRole.objects.get(name="Video Editor")
+        buyer = JobRole.objects.get(name="Media Buyer")
+        for member, role in [(ana,editor),(marko,buyer),(iva,editor)]:
+            MemberRole.objects.create(user=member, role=role)
+        scope = f"/tim/{iva.pk}/approval-roles/"
+        self.other.post(scope, {"roles":[editor.pk]})
+        item = self.ask()
+        for worker in (marko, iva):
+            LeaveRequest.objects.create(worker=worker, start=self.friday, end=self.friday, kind="free", note="hidden")
+        page = self.admin.get("/zahtjevi/")
+        self.assertEqual(page.context["pending"], 1)
+        self.assertEqual([r.pk for r in page.context["items"]], [item.pk])
+        self.assertEqual(self.admin.get("/tim/").status_code, 403)
+        self.assertEqual(self.admin.post(scope, {"roles":[buyer.pk]}).status_code, 403)
+        for other in LeaveRequest.objects.exclude(pk=item.pk):
+            self.assertEqual(self.admin.post(f"/zahtjevi/{other.pk}/odluka/", {"choice":"rejected"}).status_code, 404)
+        self.admin.post(f"/zahtjevi/{item.pk}/odluka/", {"choice":"approved"})
+        item.refresh_from_db()
+        self.assertEqual(item.status, "approved")
+        self.other.post(scope, {"roles":[editor.pk,buyer.pk]})
+        self.assertEqual(self.admin.get("/zahtjevi/").context["pending"], 1)
+        self.other.post(scope, {})
+        self.assertEqual(self.admin.get("/zahtjevi/").status_code, 403)
+
     def test_promote_member(self):
         ana = User.objects.get(username="Ana")
         url = f"/tim/{ana.pk}/administrator/"

@@ -11,6 +11,7 @@ class PendingRegistration(models.Model):
 
 
 class JobRole(models.Model):
+    approvers = models.ManyToManyField(User, blank=True, related_name="approval_roles")
     COLORS = [("purple", "Purple"), ("blue", "Blue"), ("green", "Green"),
               ("amber", "Yellow"), ("pink", "Pink"), ("teal", "Teal")]
     name = models.CharField(max_length=60)

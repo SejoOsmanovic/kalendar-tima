@@ -14,10 +14,18 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import Ask, Entry, Member, Registration, RoleSelection
+from .forms import Ask, Entry, Member, Registration, RoleSelection, ApprovalScope
 from .models import Day, KINDS, LeaveRequest, PendingRegistration, JobRole, MemberRole, EntryType
 
 MONTHS = "January February March April May June July August September October November December".split()
+
+
+def reviewable_requests(user):
+    if user.is_staff:
+        return LeaveRequest.objects.all()
+    if not user.approval_roles.exists():
+        return None
+    return LeaveRequest.objects.filter(worker__job__role__approvers=user).exclude(worker=user)
 
 
 def badge(request):
@@ -25,8 +33,10 @@ def badge(request):
         return {}
     context = {"decisions": LeaveRequest.objects.filter(worker=request.user, decision_seen=False,
                status__in=["approved", "rejected"]).order_by("-decided")}
-    if request.user.is_staff:
-        context["pending"] = LeaveRequest.objects.filter(status="pending").count()
+    requests = reviewable_requests(request.user)
+    if requests is not None:
+        context["can_review"] = True
+        context["pending"] = requests.filter(status="pending").count()
     return context
 
 
@@ -161,25 +171,32 @@ def withdraw(request, pk):
     return redirect("mine")
 
 
-@admin
+@login_required
 def queue(request):
-    items = LeaveRequest.objects.select_related("worker", "reviewer").order_by("-pk")
+    requests = reviewable_requests(request.user)
+    if requests is None:
+        raise PermissionDenied
+    items = requests.select_related("worker", "reviewer").order_by("-pk")
     for item in items:
         if item.status == "pending":
             item.overlap = Day.objects.filter(date__range=(item.start, item.end)).exclude(worker=item.worker).select_related("worker").order_by("date","worker__first_name")
     return render(request, "requests.html", {"items": sorted(items, key=lambda r: r.status != "pending"), "review": True})
 
 
-@admin
+@login_required
 @require_POST
 def decide(request, pk):
+    requests = reviewable_requests(request.user)
+    if requests is None:
+        raise PermissionDenied
+    get_object_or_404(requests.only("pk"), pk=pk)
     choice = request.POST.get("choice")
     comment = request.POST.get("comment", "").strip()
     if choice not in ("approved","rejected") or len(comment)>2000:
         return HttpResponseBadRequest("Invalid decision or comment.")
     try:
         with transaction.atomic():
-            changed = LeaveRequest.objects.filter(pk=pk, status="pending").update(status=choice, reviewer=request.user, decided=timezone.now(), comment=comment)
+            changed = requests.filter(pk=pk, status="pending").update(status=choice, reviewer=request.user, decided=timezone.now(), comment=comment)
             if not changed:
                 messages.info(request, "This request has already been reviewed or withdrawn.")
             else:
@@ -208,7 +225,25 @@ def team(request):
             return redirect("team")
     return render(request, "team.html", {"form": form, "roles": JobRole.objects.all(), "colors": JobRole.COLORS,
         "registrations": PendingRegistration.objects.select_related("user__job__role").order_by("pk"),
-        "members": User.objects.filter(pending_registration__isnull=True).select_related("job__role").order_by("-is_active","first_name","username")})
+        "members": User.objects.filter(pending_registration__isnull=True).select_related("job__role").prefetch_related("approval_roles").order_by("-is_active","first_name","username")})
+
+
+@admin
+@require_POST
+def approval_scope(request, pk):
+    if pk == request.user.pk:
+        raise PermissionDenied
+    form = ApprovalScope(request.POST)
+    if not form.is_valid():
+        return HttpResponseBadRequest("Select valid job roles.")
+    with transaction.atomic():
+        member = get_object_or_404(User.objects.select_for_update(), pk=pk, is_active=True, is_superuser=False)
+        member.approval_roles.set(form.cleaned_data["roles"])
+        if member.is_staff:
+            member.is_staff = False
+            member.save(update_fields=["is_staff"])
+    messages.success(request, "Approval permissions saved.")
+    return redirect("team")
 
 
 @admin

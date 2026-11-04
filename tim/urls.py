@@ -18,6 +18,7 @@ urlpatterns = [
     path("zahtjevi/", views.queue, name="queue"),
     path("zahtjevi/<int:pk>/odluka/", views.decide, name="decide"),
     path("tim/", views.team, name="team"),
+    path("tim/<int:pk>/approval-roles/", views.approval_scope, name="approval_scope"),
     path("tim/role/", views.add_role, name="add_role"),
     path("tim/<int:pk>/rola/", views.assign_role, name="assign_role"),
     path("tim/<int:pk>/administrator/", views.promote, name="promote"),
