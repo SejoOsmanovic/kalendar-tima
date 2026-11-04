@@ -1,7 +1,9 @@
 {% if google_client_id %}
 <form id="google-signin" action="{% url 'google_verify' %}" method="post">
   {% csrf_token %}<input type="hidden" name="credential">
-  <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="submitGoogleSignIn" data-auto_prompt="false"></div>
+  <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-auto_prompt="false"
+       {% if google_return_url %}data-ux_mode="redirect" data-login_uri="{{ google_return_url }}"
+       {% else %}data-callback="submitGoogleSignIn"{% endif %}></div>
   <div class="g_id_signin" data-type="standard" data-text="continue_with" data-theme="outline" data-width="240"></div>
   <p id="google-status" role="status"></p>
 </form>

@@ -8,6 +8,8 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.utils.crypto import constant_time_compare
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import Request
@@ -19,6 +21,21 @@ from .models import GoogleIdentity, MemberRole, PendingRegistration
 
 @require_POST
 def verify(request):
+    return complete_sign_in(request)
+
+
+@csrf_exempt
+@require_POST
+def google_return(request):
+    # Google's cross-site form POST uses its own double-submit CSRF token.
+    cookie = request.COOKIES.get("g_csrf_token", "")
+    if not cookie or not constant_time_compare(cookie, request.POST.get("g_csrf_token", "")):
+        messages.error(request, "Your Google sign-in session expired. Please start again.")
+        return redirect("login")
+    return complete_sign_in(request)
+
+
+def complete_sign_in(request):
     if not settings.GOOGLE_CLIENT_ID:
         raise Http404
     if request.user.is_authenticated:

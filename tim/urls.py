@@ -6,6 +6,7 @@ from .forms import TeamLogin
 
 urlpatterns = [
     path("auth/google/verify/", google_login.verify, name="google_verify"),
+    path("auth/google/return/", google_login.google_return, name="google_return"),
     path("auth/google/register/", google_login.register, name="google_register"),
     path("preferences/", views.preferences, name="preferences"),
     path("", views.calendar_view, name="calendar"),

@@ -9,6 +9,20 @@ from .models import JobRole
 
 @override_settings(GOOGLE_CLIENT_ID="test-client")
 class GoogleSignInTests(TestCase):
+    @override_settings(GOOGLE_REDIRECT_ENABLED=True)
+    @patch("tim.google_login.verify_oauth2_token")
+    def test_google_redirect_verifies_csrf_and_opens_profile(self, verify):
+        self.assertContains(self.client.get("/registracija/"), 'data-ux_mode="redirect"')
+        self.client.cookies["g_csrf_token"] = "browser-token"
+        url = "/auth/google/return/"
+        self.assertRedirects(self.client.post(url, {"g_csrf_token":"wrong"}), "/prijava/")
+        verify.assert_not_called()
+        verify.return_value = {"sub":"google-sub", "email":"member@example.com", "email_verified":True,
+                               "given_name":"Ana", "exp":time()+600}
+        page = self.client.post(url, {"credential":"test", "g_csrf_token":"browser-token"}, follow=True)
+        self.assertContains(page, "Complete your registration")
+        self.assertContains(page, 'value="Ana"')
+
     @patch("tim.google_login.verify_oauth2_token")
     def test_manual_names_and_approval(self, verify):
         verify.return_value = {"sub": "google-sub", "email": "member@example.com", "email_verified": True,

@@ -45,7 +45,8 @@ def preferences(request):
 
 def badge(request):
     if not request.user.is_authenticated:
-        return {"google_client_id": settings.GOOGLE_CLIENT_ID}
+        return {"google_client_id": settings.GOOGLE_CLIENT_ID,
+                "google_return_url": request.build_absolute_uri(reverse("google_return")) if settings.GOOGLE_REDIRECT_ENABLED else ""}
     context = {"date_format": "d.m.Y." if date_style(request.user) == "eu" else "m/d/Y",
                "decisions": LeaveRequest.objects.filter(worker=request.user, decision_seen=False,
                status__in=["approved", "rejected"]).order_by("-decided")}
