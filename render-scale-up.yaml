@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: scale-up-vacation-tracker
+    runtime: docker
+    region: frankfurt
+    plan: free
+    healthCheckPath: /prijava/
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: HTTPS
+        value: "1"
