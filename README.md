@@ -77,7 +77,7 @@ docker compose start web
 
 Create a Web application client in Google Auth Platform. Add the site's HTTPS origin under Authorized JavaScript origins and configure the Google audience for your team. Set the public client ID as `GOOGLE_CLIENT_ID` in the web service environment and redeploy. The Google button appears on the sign-in and registration pages when the ID is set.
 
-New Google users enter their first and last names, select a job role and await administrator approval. Existing password accounts keep their original sign-in method.
+New Google users review or complete the first and last names suggested by Google, select a job role and await administrator approval. Existing password accounts keep their original sign-in method.
 
 ## Checks
 

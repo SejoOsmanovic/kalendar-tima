@@ -44,7 +44,10 @@ def verify(request):
         messages.info(request, "An account already uses this email. Sign in with your existing password.")
         return redirect("login")
     request.session.cycle_key()
-    request.session["google_signup"] = {"email": email, "subject": subject, "expires": min(claims["exp"], time() + 600)}
+    request.session["google_signup"] = {
+        "email": email, "subject": subject, "expires": min(claims["exp"], time() + 600),
+        "names": {"first_name": claims.get("given_name") or "", "last_name": claims.get("family_name") or ""},
+    }
     return redirect("google_register")
 
 
@@ -57,7 +60,7 @@ def register(request):
     if not signup or signup["expires"] <= time():
         messages.info(request, "Continue with Google to start registration.")
         return redirect("register")
-    form = GoogleRegistration(request.POST if request.method == "POST" else None)
+    form = GoogleRegistration(request.POST if request.method == "POST" else None, initial=signup.get("names", {}))
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         try:
@@ -74,4 +77,5 @@ def register(request):
         request.session.pop("google_signup", None)
         return redirect("login")
     return render(request, "form.html", {"title": "Complete your registration", "form": form,
+                                          "signup_email": signup["email"],
                                           "button": "Request access"})

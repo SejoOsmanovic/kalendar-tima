@@ -12,10 +12,13 @@ class GoogleSignInTests(TestCase):
     @patch("tim.google_login.verify_oauth2_token")
     def test_manual_names_and_approval(self, verify):
         verify.return_value = {"sub": "google-sub", "email": "member@example.com", "email_verified": True,
-                               "name": "Google Profile", "exp": time() + 1000}
+                               "given_name": "Anita", "family_name": "Smith", "exp": time() + 1000}
         endpoint = "/auth/google/verify/"
         self.assertContains(self.client.get("/registracija/"), "g_id_signin")
         self.assertRedirects(self.client.post(endpoint, {"credential": "test"}), "/auth/google/register/")
+        panel = self.client.get("/auth/google/register/")
+        self.assertContains(panel, 'value="Anita"')
+        self.assertContains(panel, 'value="Smith"')
         data = {"job_role": JobRole.objects.first().pk, "first_name": "Ana"}
         self.client.post("/auth/google/register/", data)
         self.assertFalse(User.objects.exists())
