@@ -1,5 +1,5 @@
 {% load static %}<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}Scale Up Vacation Tracker{% endblock %}</title><link rel="stylesheet" href="{% static 'tim.css' %}"></head><body>
-<header><div class="bar"><a class="brand" href="/"><span class="icon">▦</span> Scale Up Vacation Tracker</a>{% if user.is_authenticated %}<nav aria-label="Main menu"><a href="/">Calendar</a><a href="/moji/">My requests</a>{% if can_review %}<a href="/zahtjevi/">Requests <b>{{ pending }}</b></a>{% endif %}{% if user.is_staff %}<a href="/tim/">Team{% if pending_registrations %} <b title="Pending registrations">{{ pending_registrations }}</b>{% endif %}</a>{% endif %}<a href="/preferences/">My preferences</a></nav><form method="post" action="/odjava/">{% csrf_token %}<span>{{ user.get_full_name|default:user.username }}</span> <button class="light">Sign out</button></form>{% endif %}</div></header>
+<header><div class="bar"><a class="brand" href="/"><span class="icon">▦</span> Scale Up Vacation Tracker</a>{% if user.is_authenticated %}<nav aria-label="Main menu"><a href="/">Calendar</a><a href="/moji/">My requests</a>{% if can_review %}<a href="/zahtjevi/">Requests <b>{{ pending }}</b></a>{% endif %}{% if user.is_staff %}<a href="/tim/">Team <b id="registration-count" title="Pending registrations" data-url="{% url 'registration_count' %}">{{ pending_registrations }}</b></a>{% endif %}<a href="/preferences/">My preferences</a></nav><form method="post" action="/odjava/">{% csrf_token %}<span>{{ user.get_full_name|default:user.username }}</span> <button class="light">Sign out</button></form>{% endif %}</div></header>
 <main>{% for message in messages %}<p class="notice" role="status">{{ message }}</p>{% endfor %}
 {% for decision in decisions %}
 <section class="notice{% if decision.status == 'rejected' %} rejected{% endif %}" aria-label="Request update">
@@ -8,4 +8,4 @@
 {% if decision.comment %}<p>Administrator comment · {{ decision.comment }}</p>{% endif %}
 <form method="post" action="{% url 'acknowledge' decision.pk %}">{% csrf_token %}<button class="light">Mark as read</button></form>
 </section>{% endfor %}
-{% block body %}{% endblock %}</main></body></html>
+{% block body %}{% endblock %}</main>{% if user.is_staff %}<script type="module" src="{% static 'team-count.js' %}"></script>{% endif %}</body></html>

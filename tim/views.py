@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -226,6 +226,11 @@ def decide(request, pk):
     except IntegrityError:
         messages.error(request, "This member already has time off during this period. The request is still pending.")
     return redirect("queue")
+
+
+@admin
+def registration_count(request):
+    return JsonResponse({"count": PendingRegistration.objects.count()}, headers={"Cache-Control": "private, no-store"})
 
 
 @admin
