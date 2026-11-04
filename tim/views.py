@@ -100,7 +100,13 @@ def calendar_view(request):
     days = defaultdict(list)
     for row in rows:
         days[row.date].append(row)
-    cells = [{"date": d, "kinds": sorted({(row.badge_class, row.label) for row in days[d]})} for d in dates]
+    cells = []
+    for day in dates:
+        kinds = set()
+        for row in days[day]:
+            show_pto = row.is_paid is True and (request.user.is_staff or row.worker_id == request.user.pk)
+            kinds.add((row.badge_class, row.label, show_pto))
+        cells.append({"date": day, "kinds": sorted(kinds)})
     first = selected.replace(day=1)
     return render(request, "calendar.html", {"selected": selected, "today": today, "month": MONTHS[selected.month-1],
         "prev": (first-timedelta(days=1)).replace(day=1), "next": (first+timedelta(days=32)).replace(day=1),

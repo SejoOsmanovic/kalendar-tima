@@ -29,7 +29,7 @@ class TeamFlow(TestCase):
         page = self.marko.get(url)
         self.assertEqual([row.worker_id for row in page.context["rows"]], [ana.pk])
         cell = next(c for c in page.context["cells"] if c["date"] == self.friday)
-        self.assertEqual(cell["kinds"], [("free", "Day off")])
+        self.assertEqual(cell["kinds"], [("free", "Day off", False)])
         self.assertContains(page, f'&amp;rola={editor.pk}"')
         self.assertFalse(self.marko.get(url + f"&osoba={marko.pk}").context["rows"])
 
