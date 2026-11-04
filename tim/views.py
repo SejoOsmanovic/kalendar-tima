@@ -54,6 +54,8 @@ def badge(request):
     if requests is not None:
         context["can_review"] = True
         context["pending"] = requests.filter(status="pending").count()
+    if request.user.is_staff:
+        context["pending_registrations"] = PendingRegistration.objects.count()
     return context
 
 
