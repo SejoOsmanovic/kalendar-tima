@@ -4,6 +4,7 @@ from . import views
 from .forms import TeamLogin
 
 urlpatterns = [
+    path("preferences/", views.preferences, name="preferences"),
     path("", views.calendar_view, name="calendar"),
     path("prijava/", LoginView.as_view(template_name="login.html", authentication_form=TeamLogin), name="login"),
     path("registracija/", views.register, name="register"),

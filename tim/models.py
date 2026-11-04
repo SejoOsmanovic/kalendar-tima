@@ -6,6 +6,12 @@ KINDS = LEAVE + [("holiday", "Holiday"), ("closed", "Company closure")]
 STATES = [("pending", "Pending"), ("approved", "Approved"), ("rejected", "Declined"), ("withdrawn", "Withdrawn")]
 
 
+class DatePreference(models.Model):
+    FORMATS = [("us", "Month first (MM/DD/YYYY)"), ("eu", "Day first (DD.MM.YYYY.)")]
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="date_preference")
+    style = models.CharField(max_length=2, choices=FORMATS, default="us")
+
+
 class PendingRegistration(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="pending_registration")
 

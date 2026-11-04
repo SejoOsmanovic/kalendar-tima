@@ -26,7 +26,7 @@ The web service applies migrations at startup. Use `docker compose down` to stop
 ## Using the calendar
 
 - Select a date to see each absent member, their job role and the type of leave. Member and role filters persist when you change months.
-- Choose **Request time off** and enter dates in DD.MM.YYYY format. Leave **To** blank for a single day. Ranges include weekends, holidays and both endpoints, up to 366 days.
+- Choose **Request time off** and enter dates in your preferred format. The default is MM/DD/YYYY. Choose **My preferences** to switch to DD.MM.YYYY.. Leave **To** blank for a single day. Ranges include weekends, holidays and both endpoints, up to 366 days.
 - **New entry** records leave directly for selected members or all currently active accounts, including administrators. You can also create entry types and choose their colors.
 - Approval and calendar entries are saved together. If a member already has an entry on an included date, the entire change is canceled. Only the first decision on a pending request is accepted.
 - Archiving an account disables access and withdraws pending requests while preserving calendar entries and decision history.

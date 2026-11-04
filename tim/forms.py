@@ -1,16 +1,39 @@
+from datetime import datetime
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
-from .models import KINDS, LEAVE, JobRole, EntryType
+from .models import KINDS, LEAVE, JobRole, EntryType, DatePreference
 
 
 DATE_FORMATS = ("%d.%m.%Y.", "%d.%m.%Y")
+
+
+class DateSettings(forms.Form):
+    style = forms.ChoiceField(label="Date format", choices=DatePreference.FORMATS)
 
 
 class Period(forms.Form):
     kind = forms.ChoiceField(label="Leave type", choices=LEAVE)
     start = forms.DateField(label="From", input_formats=DATE_FORMATS, widget=forms.TextInput(attrs={"placeholder": "DD.MM.YYYY."}))
     end = forms.DateField(label="To", required=False, input_formats=DATE_FORMATS, help_text="Leave blank for a single day.", widget=forms.TextInput(attrs={"placeholder": "DD.MM.YYYY."}))
+
+    def __init__(self, *args, date_style="us", **kwargs):
+        super().__init__(*args, **kwargs)
+        month_first = date_style == "us"
+        formats = ("%m/%d/%Y", *DATE_FORMATS) if month_first else DATE_FORMATS
+        for key in ("start", "end"):
+            field = self.fields[key]
+            field.input_formats = formats
+            field.widget.attrs["placeholder"] = "MM/DD/YYYY" if month_first else "DD.MM.YYYY."
+            raw = self.initial.get(key)
+            if raw:
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y", *DATE_FORMATS):
+                    try:
+                        self.initial[key] = datetime.strptime(raw, fmt).strftime(formats[0])
+                        break
+                    except ValueError:
+                        continue
 
     def clean(self):
         data = super().clean()

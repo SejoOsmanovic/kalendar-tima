@@ -14,8 +14,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import Ask, Entry, Member, Registration, RoleSelection, ApprovalScope
-from .models import Day, KINDS, LeaveRequest, PendingRegistration, JobRole, MemberRole, EntryType
+from .forms import Ask, Entry, Member, Registration, RoleSelection, ApprovalScope, DateSettings
+from .models import Day, KINDS, LeaveRequest, PendingRegistration, JobRole, MemberRole, EntryType, DatePreference
 
 MONTHS = "January February March April May June July August September October November December".split()
 
@@ -28,10 +28,25 @@ def reviewable_requests(user):
     return LeaveRequest.objects.filter(worker__job__role__approvers=user).exclude(worker=user)
 
 
+def date_style(user):
+    return getattr(getattr(user, "date_preference", None), "style", "us")
+
+
+@login_required
+def preferences(request):
+    form = DateSettings(request.POST if request.method == "POST" else None, initial={"style": date_style(request.user)})
+    if request.method == "POST" and form.is_valid():
+        DatePreference.objects.update_or_create(user=request.user, defaults={"style": form.cleaned_data["style"]})
+        messages.success(request, "Your date format has been saved.")
+        return redirect("calendar")
+    return render(request, "form.html", {"title": "My preferences", "button": "Save preferences", "form": form})
+
+
 def badge(request):
     if not request.user.is_authenticated:
         return {}
-    context = {"decisions": LeaveRequest.objects.filter(worker=request.user, decision_seen=False,
+    context = {"date_format": "d.m.Y." if date_style(request.user) == "eu" else "m/d/Y",
+               "decisions": LeaveRequest.objects.filter(worker=request.user, decision_seen=False,
                status__in=["approved", "rejected"]).order_by("-decided")}
     requests = reviewable_requests(request.user)
     if requests is not None:
@@ -97,7 +112,7 @@ def insert_days(workers, start, end, kind, source=None, holiday_name="", entry_t
 
 @login_required
 def ask(request):
-    form = Ask(request.POST if request.method == "POST" else None, initial={"start": request.GET.get("datum", "")})
+    form = Ask(request.POST if request.method == "POST" else None, date_style=date_style(request.user), initial={"start": request.GET.get("datum", "")})
     if request.method == "POST" and form.is_valid():
         LeaveRequest.objects.create(worker=request.user, **form.cleaned_data)
         messages.success(request, "Your request has been submitted.")
@@ -139,7 +154,7 @@ def entry(request):
                 messages.success(request, "The new type is selected for this entry.")
                 return redirect(reverse("entry", query={"datum": request.GET.get("datum", ""), "vrsta": f"custom-{entry_type.pk}"}))
         return redirect(reverse("entry", query={"datum": request.GET.get("datum", "")}))
-    form = Entry(request.POST if request.method == "POST" else None,
+    form = Entry(request.POST if request.method == "POST" else None, date_style=date_style(request.user),
                  initial={"start": request.GET.get("datum", ""), "kind": request.GET.get("vrsta", "free")})
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data

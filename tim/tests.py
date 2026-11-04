@@ -39,7 +39,7 @@ class TeamFlow(TestCase):
         page = self.admin.post("/unos/?datum=06.11.2026.", payload, follow=True)
         kind = f"custom-{EntryType.objects.get(name='Edukacija').pk}"
         self.assertEqual(page.context["form"]["kind"].value(), kind)
-        self.assertEqual(page.context["form"]["start"].value(), "06.11.2026.")
+        self.assertEqual(page.context["form"]["start"].value(), "11/06/2026")
         self.other.post("/unos/", {"kind":kind, "start":"06.11.2026.", "scope":"all"})
         self.assertEqual({row.label for row in self.ana.get(self.url).context["rows"]}, {"Edukacija"})
         self.assertContains(self.ana.get(self.url), 'class="tag custom role-teal">Edukacija</span>', count=6)
@@ -50,6 +50,17 @@ class TeamFlow(TestCase):
         self.assertContains(self.ana.get(self.url), 'class="tag custom role-blue">Edukacija</span>', count=6)
         self.admin.post("/unos/", {"action":"add_type", "name":"edukacija"})
         self.assertEqual(EntryType.objects.count(), 1)
+
+    def test_personal_date_format(self):
+        self.ana.post("/trazi/", {"kind":"free", "start":"03/04/2027"})
+        self.assertEqual(LeaveRequest.objects.get().start, date(2027, 3, 4))
+        self.assertContains(self.ana.get("/moji/"), "03/04/2027")
+        self.ana.post("/preferences/", {"style":"eu"})
+        self.assertContains(self.ana.get("/moji/"), "04.03.2027.")
+        self.assertContains(self.admin.get("/zahtjevi/"), "03/04/2027")
+        self.assertContains(self.ana.get("/trazi/?datum=2027-03-04"), "04.03.2027.")
+        self.ana.post("/trazi/", {"kind":"free", "start":"03.04.2027."})
+        self.assertEqual(LeaveRequest.objects.latest("pk").start, date(2027, 4, 3))
 
     def ask(self):
         self.ana.post("/trazi/", {"kind":"free","start":"06.11.2026.","note":"Privatna napomena"})
@@ -67,7 +78,7 @@ class TeamFlow(TestCase):
         for client in (self.admin, self.other):
             page = client.get("/zahtjevi/")
             self.assertContains(page, "Privatna napomena")
-            self.assertContains(page, "Marko · 06.11.2026. · Vacation")
+            self.assertContains(page, "Marko · 11/06/2026 · Vacation")
         self.admin.post(decision, {"choice":"approved","comment":"Dogovoreno"})
         second = self.other.post(decision, {"choice":"rejected"}, follow=True)
         self.assertContains(second, "already been reviewed")
