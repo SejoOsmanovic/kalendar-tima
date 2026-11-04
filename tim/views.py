@@ -211,11 +211,15 @@ def decide(request, pk):
     get_object_or_404(requests.only("pk"), pk=pk)
     choice = request.POST.get("choice")
     comment = request.POST.get("comment", "").strip()
+    try:
+        revision = int(request.POST.get("revision", 0))
+    except ValueError:
+        return HttpResponseBadRequest("Invalid request revision.")
     if choice not in ("approved","rejected") or len(comment)>2000:
         return HttpResponseBadRequest("Invalid decision or comment.")
     try:
         with transaction.atomic():
-            changed = requests.filter(pk=pk, status="pending").update(status=choice, reviewer=request.user, decided=timezone.now(), comment=comment)
+            changed = requests.filter(pk=pk, status="pending", revision=revision).update(status=choice, reviewer=request.user, decided=timezone.now(), comment=comment, decision_seen=False)
             if not changed:
                 messages.info(request, "This request has already been reviewed or withdrawn.")
             else:
@@ -225,6 +229,27 @@ def decide(request, pk):
                 messages.success(request, "Decision saved.")
     except IntegrityError:
         messages.error(request, "This member already has time off during this period. The request is still pending.")
+    return redirect("queue")
+
+
+@admin
+@require_POST
+def undo_decision(request, pk):
+    with transaction.atomic():
+        item = get_object_or_404(LeaveRequest.objects.select_for_update(), pk=pk)
+        if item.status not in ("approved", "rejected") or request.POST.get("revision") != str(item.revision):
+            messages.info(request, "This decision has already changed. Review the latest request.")
+            return redirect("queue")
+        item.reversed_decisions.create(status=item.status, reviewer_id=item.reviewer_id, decided=item.decided,
+                                       comment=item.comment, reversed_by=request.user)
+        Day.objects.filter(source=item).delete()
+        item.status = "pending"
+        item.reviewer = item.decided = None
+        item.comment = ""
+        item.decision_seen = False
+        item.revision += 1
+        item.save(update_fields=["status", "reviewer", "decided", "comment", "decision_seen", "revision"])
+    messages.success(request, "Decision undone. You can now review the request again.")
     return redirect("queue")
 
 

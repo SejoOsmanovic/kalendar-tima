@@ -52,6 +52,17 @@ class LeaveRequest(models.Model):
     reviewer = models.ForeignKey(User, null=True, related_name="decisions", on_delete=models.PROTECT)
     decided = models.DateTimeField(null=True)
     decision_seen = models.BooleanField(default=False)
+    revision = models.PositiveIntegerField(default=0)
+
+
+class ReversedDecision(models.Model):
+    request = models.ForeignKey(LeaveRequest, related_name="reversed_decisions", on_delete=models.CASCADE)
+    status = models.CharField(max_length=12, choices=STATES)
+    reviewer = models.ForeignKey(User, related_name="+", on_delete=models.PROTECT)
+    decided = models.DateTimeField()
+    comment = models.TextField(blank=True)
+    reversed_by = models.ForeignKey(User, related_name="+", on_delete=models.PROTECT)
+    reversed_at = models.DateTimeField(auto_now_add=True)
 
 
 class EntryType(models.Model):
