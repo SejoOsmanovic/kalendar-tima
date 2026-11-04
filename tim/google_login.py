@@ -1,3 +1,4 @@
+from functools import partial
 from time import time
 
 from django.conf import settings
@@ -24,7 +25,7 @@ def verify(request):
         return redirect("calendar")
     request.session.pop("google_signup", None)
     try:
-        claims = verify_oauth2_token(request.POST.get("credential", ""), Request(), settings.GOOGLE_CLIENT_ID)
+        claims = verify_oauth2_token(request.POST.get("credential", ""), partial(Request(), timeout=8), settings.GOOGLE_CLIENT_ID)
     except (ValueError, GoogleAuthError):
         messages.error(request, "Google sign-in could not be verified. Please try again.")
         return redirect("login")
