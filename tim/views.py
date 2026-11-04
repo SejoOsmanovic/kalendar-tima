@@ -109,8 +109,8 @@ def calendar_view(request):
         "legend": KINDS + [(t.badge_class, t.name) for t in EntryType.objects.all()]})
 
 
-def insert_days(workers, start, end, kind, source=None, holiday_name="", entry_type_id=None):
-    Day.objects.bulk_create([Day(worker=w, date=start+timedelta(days=i), kind=kind, source=source, holiday_name=holiday_name, entry_type_id=entry_type_id)
+def insert_days(workers, start, end, kind, source=None, holiday_name="", entry_type_id=None, *, is_paid):
+    Day.objects.bulk_create([Day(worker=w, date=start+timedelta(days=i), kind=kind, source=source, holiday_name=holiday_name, entry_type_id=entry_type_id, is_paid=is_paid)
         for w in workers for i in range((end-start).days+1)], batch_size=1000)
 
 
@@ -166,7 +166,7 @@ def entry(request):
             with transaction.atomic():
                 workers = User.objects.filter(is_active=True) if data["scope"] == "all" else data["workers"]
                 kind, _, type_id = data["kind"].partition("-")
-                insert_days(workers.order_by("pk"), data["start"], data["end"], kind, entry_type_id=type_id or None,
+                insert_days(workers.order_by("pk"), data["start"], data["end"], kind, entry_type_id=type_id or None, is_paid=data["is_paid"],
                             holiday_name=data["holiday_name"] if data["kind"] == "holiday" else "")
         except IntegrityError:
             form.add_error(None, "A selected member already has an absence on one of these dates. No entries were saved.")
@@ -219,13 +219,14 @@ def decide(request, pk):
         return HttpResponseBadRequest("Invalid decision or comment.")
     try:
         with transaction.atomic():
-            changed = requests.filter(pk=pk, status="pending", revision=revision).update(status=choice, reviewer=request.user, decided=timezone.now(), comment=comment, decision_seen=False)
+            paid = request.POST.get("is_paid") == "on" if choice == "approved" else None
+            changed = requests.filter(pk=pk, status="pending", revision=revision).update(status=choice, reviewer=request.user, decided=timezone.now(), comment=comment, decision_seen=False, is_paid=paid)
             if not changed:
                 messages.info(request, "This request has already been reviewed or withdrawn.")
             else:
                 if choice == "approved":
                     item = LeaveRequest.objects.select_related("worker").get(pk=pk)
-                    insert_days([item.worker], item.start, item.end, item.kind, item)
+                    insert_days([item.worker], item.start, item.end, item.kind, item, is_paid=item.is_paid)
                 messages.success(request, "Decision saved.")
     except IntegrityError:
         messages.error(request, "This member already has time off during this period. The request is still pending.")
@@ -241,14 +242,15 @@ def undo_decision(request, pk):
             messages.info(request, "This decision has already changed. Review the latest request.")
             return redirect("queue")
         item.reversed_decisions.create(status=item.status, reviewer_id=item.reviewer_id, decided=item.decided,
-                                       comment=item.comment, reversed_by=request.user)
+                                       comment=item.comment, reversed_by=request.user, is_paid=item.is_paid)
         Day.objects.filter(source=item).delete()
         item.status = "pending"
         item.reviewer = item.decided = None
         item.comment = ""
         item.decision_seen = False
+        item.is_paid = None
         item.revision += 1
-        item.save(update_fields=["status", "reviewer", "decided", "comment", "decision_seen", "revision"])
+        item.save(update_fields=["status", "reviewer", "decided", "comment", "decision_seen", "revision", "is_paid"])
     messages.success(request, "Decision undone. You can now review the request again.")
     return redirect("queue")
 

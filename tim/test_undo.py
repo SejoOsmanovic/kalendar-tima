@@ -20,8 +20,8 @@ class UndoDecisionTest(TestCase):
         decide = f"/zahtjevi/{item.pk}/odluka/"
         undo = f"/zahtjevi/{item.pk}/undo/"
         self.client.force_login(approver)
-        self.client.post(decide, {"choice":"approved", "comment":"First decision"})
-        self.assertTrue(Day.objects.filter(source=item).exists())
+        self.client.post(decide, {"choice":"approved", "comment":"First decision", "is_paid":"on"})
+        self.assertTrue(Day.objects.get(source=item).is_paid)
         self.assertNotContains(self.client.get("/zahtjevi/"), "Undo decision")
         for user in (approver, worker):
             self.client.force_login(user)
@@ -35,10 +35,20 @@ class UndoDecisionTest(TestCase):
         item.refresh_from_db()
         self.assertEqual(item.status, "pending")
         self.assertEqual(item.reversed_decisions.get().reviewer, approver)
+        self.assertTrue(item.reversed_decisions.get().is_paid)
+        self.assertIsNone(item.is_paid)
         self.client.post(decide, {"revision":"1", "choice":"rejected"})
         self.client.post(undo, {"revision":"0"})
         item.refresh_from_db()
         self.assertEqual(item.status, "rejected")
         self.client.post(undo, {"revision":"1"})
         self.client.post(decide, {"revision":"2", "choice":"approved"})
-        self.assertEqual(Day.objects.filter(source=item).count(), 1)
+        self.assertIs(Day.objects.get(source=item).is_paid, False)
+
+    def test_manual_paid_holiday_range(self):
+        admin = User.objects.create_user("admin", is_staff=True)
+        self.client.force_login(admin)
+        self.client.post("/unos/", {"kind":"holiday", "holiday_name":"New Year", "scope":"all",
+                                    "start":"01/01/2027", "end":"01/02/2027", "is_paid":"on"})
+        self.assertEqual(Day.objects.filter(is_paid=True).count(), 2)
+        self.assertContains(self.client.get("/?dan=2027-01-01"), "PTO (paid)")

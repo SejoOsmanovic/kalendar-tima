@@ -54,7 +54,8 @@ class People(forms.ModelMultipleChoiceField):
 
 
 class Entry(Period):
-    field_order = ["kind", "holiday_name", "start", "end", "scope", "workers"]
+    field_order = ["kind", "holiday_name", "is_paid", "start", "end", "scope", "workers"]
+    is_paid = forms.BooleanField(label="PTO (paid time off)", required=False, help_text="Leave unchecked for unpaid time off.")
     holiday_name = forms.CharField(label="Holiday name (optional)", max_length=100, required=False)
     kind = forms.ChoiceField(label="Entry type", choices=KINDS)
     scope = forms.ChoiceField(label="Applies to", choices=[("all", "All active team members"), ("selected", "Selected members")])

@@ -42,6 +42,7 @@ class MemberRole(models.Model):
 
 
 class LeaveRequest(models.Model):
+    is_paid = models.BooleanField(null=True)
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     start = models.DateField()
     end = models.DateField()
@@ -56,6 +57,7 @@ class LeaveRequest(models.Model):
 
 
 class ReversedDecision(models.Model):
+    is_paid = models.BooleanField(null=True)
     request = models.ForeignKey(LeaveRequest, related_name="reversed_decisions", on_delete=models.CASCADE)
     status = models.CharField(max_length=12, choices=STATES)
     reviewer = models.ForeignKey(User, related_name="+", on_delete=models.PROTECT)
@@ -80,6 +82,7 @@ class EntryType(models.Model):
 
 
 class Day(models.Model):
+    is_paid = models.BooleanField(null=True)
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     date = models.DateField(db_index=True)
     kind = models.CharField(max_length=12, choices=KINDS + [("custom", "Custom entry")])
