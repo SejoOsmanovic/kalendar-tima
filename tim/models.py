@@ -1,9 +1,9 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-LEAVE = [("free", "Slobodan dan"), ("vacation", "Godišnji odmor")]
-KINDS = LEAVE + [("holiday", "Praznik"), ("closed", "Neradni dan firme")]
-STATES = [("pending", "Na čekanju"), ("approved", "Odobreno"), ("rejected", "Odbijeno"), ("withdrawn", "Povučeno")]
+LEAVE = [("free", "Day off"), ("vacation", "Vacation")]
+KINDS = LEAVE + [("holiday", "Holiday"), ("closed", "Company closure")]
+STATES = [("pending", "Pending"), ("approved", "Approved"), ("rejected", "Declined"), ("withdrawn", "Withdrawn")]
 
 
 class PendingRegistration(models.Model):
@@ -11,8 +11,8 @@ class PendingRegistration(models.Model):
 
 
 class JobRole(models.Model):
-    COLORS = [("purple", "Ljubičasta"), ("blue", "Plava"), ("green", "Zelena"),
-              ("amber", "Žuta"), ("pink", "Roza"), ("teal", "Tirkizna")]
+    COLORS = [("purple", "Purple"), ("blue", "Blue"), ("green", "Green"),
+              ("amber", "Yellow"), ("pink", "Pink"), ("teal", "Teal")]
     name = models.CharField(max_length=60)
     color = models.CharField(max_length=10, choices=COLORS)
 
@@ -59,7 +59,7 @@ class EntryType(models.Model):
 class Day(models.Model):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     date = models.DateField(db_index=True)
-    kind = models.CharField(max_length=12, choices=KINDS + [("custom", "Dodatna vrsta")])
+    kind = models.CharField(max_length=12, choices=KINDS + [("custom", "Custom entry")])
     entry_type = models.ForeignKey(EntryType, null=True, blank=True, on_delete=models.PROTECT)
     holiday_name = models.CharField(max_length=100, blank=True, default="")
     source = models.ForeignKey(LeaveRequest, null=True, on_delete=models.PROTECT)
@@ -73,7 +73,7 @@ class Day(models.Model):
         if self.entry_type_id:
             return self.entry_type.name
         if self.kind == "holiday" and self.holiday_name:
-            return f"Praznik ({self.holiday_name})"
+            return f"Holiday ({self.holiday_name})"
         return self.get_kind_display()
 
     class Meta:

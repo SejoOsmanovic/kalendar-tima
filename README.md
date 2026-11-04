@@ -1,16 +1,16 @@
-# Kalendar tima
+# Scale Up Vacation Tracker
 
-Interna Django aplikacija sa PostgreSQL bazom. Tim koristi jedan URL, a svaki član ima zaseban nalog. Administrator upravlja članovima i unosima, vidi preklapanja i odlučuje o zahtjevima. Radnik vidi zajednički kalendar i svoje zahtjeve.
+A shared team calendar for holidays, company closures and time off. Team members request leave and track decisions. Administrators manage membership, review overlapping absences and approve or decline requests.
 
-## Lokalno pokretanje
+## Run locally
 
-Potrebni su Docker Engine sa dodatkom Compose ili Docker Desktop u režimu Linux kontejnera. U direktorijumu repozitorijuma kopirajte primjer konfiguracije.
+Install Docker Engine with Compose or Docker Desktop with Linux containers. From the project directory, copy the example configuration.
 
 ```sh
 cp .env.example .env
 ```
 
-U PowerShellu koristite `Copy-Item .env.example .env`. U datoteku `.env` unesite različite slučajno generisane vrijednosti za `SECRET_KEY` i `POSTGRES_PASSWORD`. Za svaku pokrenite sljedeću komandu jednom i sačuvajte rezultat u upravitelju lozinki.
+In PowerShell, use `Copy-Item .env.example .env`. Generate two separate random values using the first command below. Save them in a password manager and set `SECRET_KEY` and `POSTGRES_PASSWORD` in `.env` before starting the services.
 
 ```sh
 docker run --rm python:3.12-slim python -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -19,31 +19,31 @@ docker compose logs web
 docker compose exec web python manage.py createsuperuser
 ```
 
-Otvorite [lokalnu aplikaciju](http://localhost:8000) i prijavite se kreiranim nalogom. U meniju **Tim** dodajte radnike i dodatne administratore. Lozinku za svakog člana dostavite privatno. Lozinka postojećeg naloga može se promijeniti komandom `docker compose exec web python manage.py changepassword KORISNIK`.
+Open the [local app](http://localhost:8000) and sign in with your administrator account. Use **Team** to approve registrations or add members. To reset a password, run `docker compose exec web python manage.py changepassword USERNAME`.
 
-Migracije se primjenjuju pri pokretanju web servisa. `docker compose down` zaustavlja aplikaciju i čuva podatke u imenovanom volumenu. Opcija `-v` briše volumene.
+The web service applies migrations at startup. Use `docker compose down` to stop the application and keep its named volumes. The `-v` option deletes those volumes.
 
-## Rad sa kalendarom
+## Using the calendar
 
-- Klik na datum otvara dnevni pregled. Filter po radniku važi i pri prelasku na drugi mjesec.
-- **Traži slobodno** otvara zahtjev za izabrani datum. Za jedan dan polje **Do** ostaje prazno. Period uključuje oba krajnja datuma, vikende i praznike, najviše 366 dana po unosu.
-- **Novi unos** odmah evidentira datume za izabrane osobe ili sve trenutno aktivne naloge, uključujući administratore. Naknadno dodavanje radnika ne mijenja prethodne unose.
-- Odobravanje i upis odsustva čine jednu transakciju. Ako bilo koji datum već ima unos za istu osobu, cijela izmjena se poništava. Pri suprotstavljenim odlukama prolazi samo prva promjena statusa sa čekanja.
-- Arhiviranje ukida pristup, povlači zahtjeve na čekanju i zadržava evidentirana odsustva i istoriju odluka.
+- Select a date to see each absent member, their job role and the type of leave. Member and role filters persist when you change months.
+- Choose **Request time off** and enter dates in DD.MM.YYYY format. Leave **To** blank for a single day. Ranges include weekends, holidays and both endpoints, up to 366 days.
+- **New entry** records leave directly for selected members or all currently active accounts, including administrators. You can also create entry types and choose their colors.
+- Approval and calendar entries are saved together. If a member already has an entry on an included date, the entire change is canceled. Only the first decision on a pending request is accepted.
+- Archiving an account disables access and withdraws pending requests while preserving calendar entries and decision history.
 
-## Postavljanje na server sa HTTPS-om
+## Deploy with HTTPS
 
-1. Na serveru sa Dockerom smjestite repozitorijum i pripremite `.env` kao gore. Ograničite pristup toj datoteci, na Linuxu komandom `chmod 600 .env`.
-2. Usmjerite DNS zapis domena, npr. `kalendar.firma.ba`, na IP adresu servera. Otvorite TCP portove 80 i 443 za Caddy i pribavljanje TLS certifikata.
-3. Postavite sljedeće vrijednosti u `.env`, koristeći svoj stvarni domen. Zadržite iste tajne pri nadogradnjama.
+1. Copy the repository to a Docker host and prepare `.env` as above. On Linux, restrict access with `chmod 600 .env`.
+2. Point your domain to the server and open TCP ports 80 and 443 for Caddy and certificate issuance.
+3. Set your domain in `.env` as shown below. Keep your existing secrets when upgrading.
 
 ```dotenv
-DOMAIN=kalendar.firma.ba
-ALLOWED_HOSTS=kalendar.firma.ba
+DOMAIN=calendar.example.com
+ALLOWED_HOSTS=calendar.example.com
 HTTPS=1
 ```
 
-4. Pokrenite servise i napravite prvog administratora ako je baza nova.
+4. Start the services. Create the first administrator if the database is new.
 
 ```sh
 docker compose --profile https up -d --build
@@ -51,11 +51,11 @@ docker compose logs proxy web
 docker compose exec web python manage.py createsuperuser
 ```
 
-Zaposlenima podijelite HTTPS adresu svog domena. Caddy automatski pribavlja i obnavlja certifikat. PostgreSQL je dostupan unutar Docker mreže, a direktni port aplikacije vezan je za loopback. Za promjenu vremenske zone podesite `TIME_ZONE` i ponovo pokrenite Compose sa `up -d`.
+Share the HTTPS address with your team. Caddy obtains and renews certificates automatically. PostgreSQL runs on the Docker network and the web port binds to loopback. Set `TIME_ZONE` and run Compose with `up -d` to change the time zone.
 
-## Rezervna kopija i vraćanje
+## Back up and restore
 
-Napravite kopiju baze u prilagođenom PostgreSQL formatu. Koristite jedinstveno ime datoteke za svaku kopiju.
+Create a PostgreSQL custom-format backup. Choose a unique local filename for each backup.
 
 ```sh
 docker compose exec -T db pg_dump -U kalendar -d kalendar -Fc -f /tmp/kalendar.dump
@@ -63,7 +63,7 @@ docker compose cp db:/tmp/kalendar.dump ./kalendar.dump
 docker compose exec -T db rm /tmp/kalendar.dump
 ```
 
-Sačuvajte kopiju i konfiguraciju na zaštićenoj lokaciji izvan servera. Vraćanje prvo provjerite u zasebnom Compose projektu. Sljedeće komande zamjenjuju sadržaj ciljne baze. Zaustavite web servis i prethodno napravite kopiju trenutnog stanja.
+Keep the backup and configuration in a secure location outside the server. Test restoration in a separate Compose project first. The commands below replace the target database contents. Back up its current state and stop the web service before restoring.
 
 ```sh
 docker compose stop web
@@ -73,12 +73,12 @@ docker compose exec -T db rm /tmp/restore.dump
 docker compose start web
 ```
 
-## Provjere
+## Checks
 
 ```sh
 docker compose exec web python manage.py check
 docker compose exec web python manage.py test -v 2
 ```
 
-Testovi koriste izdvojenu testnu bazu. Prijavljuju Anu, Marka i dva administratora. Provjeravaju petak 06.11.2026, vidljivost napomene, Markov odmor, Anino odobrenje, drugu odluku nad istim zahtjevom, odbijanje, povlačenje, neovlašćen pristup, filtriranje, arhiviranje i poništavanje konfliktnog višednevnog unosa. Za brzu provjeru bez Dockera instalirajte Django 5.2 i tzdata, postavite `LOCAL_SQLITE=1` i privremeni `SECRET_KEY`, pa pokrenite `python manage.py test`. Podrazumijevana Compose konfiguracija koristi PostgreSQL.
+The tests run against an isolated database. They cover registration, permissions, request privacy, approval, rejection, withdrawal, overlapping absences, calendar filters and custom entry types. To test without Docker, install Django 5.2 and tzdata, set `LOCAL_SQLITE=1` and a temporary `SECRET_KEY`, then run `python manage.py test`. Compose uses PostgreSQL by default.
 

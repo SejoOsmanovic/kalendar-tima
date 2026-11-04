@@ -1,4 +1,4 @@
-<fieldset class="swatches"><legend>Boja oznake</legend>
+<fieldset class="swatches"><legend>Label color</legend>
 {% for value,label in colors %}<label class="swatch" title="{{ label }}">
 <input type="radio" name="color" value="{{ value }}" aria-label="{{ label }}" {% if value == selected %}checked{% endif %} required>
 <span class="role-{{ value }}" aria-hidden="true"></span></label>{% endfor %}

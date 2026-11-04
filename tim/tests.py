@@ -29,7 +29,7 @@ class TeamFlow(TestCase):
         page = self.marko.get(url)
         self.assertEqual([row.worker_id for row in page.context["rows"]], [ana.pk])
         cell = next(c for c in page.context["cells"] if c["date"] == self.friday)
-        self.assertEqual(cell["kinds"], [("free", "Slobodan dan")])
+        self.assertEqual(cell["kinds"], [("free", "Day off")])
         self.assertContains(page, f'&amp;rola={editor.pk}"')
         self.assertFalse(self.marko.get(url + f"&osoba={marko.pk}").context["rows"])
 
@@ -59,7 +59,7 @@ class TeamFlow(TestCase):
         self.admin.post("/unos/", {"kind":"vacation","start":"06.11.2026.","scope":"selected","workers":[User.objects.get(username="Marko").pk]})
         item = self.ask()
         decision = f"/zahtjevi/{item.pk}/odluka/"
-        self.assertContains(self.ana.get("/moji/"), "Na čekanju")
+        self.assertContains(self.ana.get("/moji/"), "Pending")
         self.assertNotContains(self.marko.get("/moji/"), "Privatna napomena")
         self.assertEqual(self.marko.get("/zahtjevi/").status_code, 403)
         self.assertNotContains(self.marko.get(self.url), "Privatna napomena")
@@ -67,19 +67,19 @@ class TeamFlow(TestCase):
         for client in (self.admin, self.other):
             page = client.get("/zahtjevi/")
             self.assertContains(page, "Privatna napomena")
-            self.assertContains(page, "Marko · 06.11.2026. · Godišnji odmor")
+            self.assertContains(page, "Marko · 06.11.2026. · Vacation")
         self.admin.post(decision, {"choice":"approved","comment":"Dogovoreno"})
         second = self.other.post(decision, {"choice":"rejected"}, follow=True)
-        self.assertContains(second, "već obrađen")
+        self.assertContains(second, "already been reviewed")
         item.refresh_from_db()
         self.assertEqual(item.reviewer.username, "Iva")
         self.assertIsNotNone(item.decided)
         self.marko.post(f"/moji/{item.pk}/procitano/")
-        self.assertContains(self.ana.get("/"), "Vaš zahtjev je odobren.")
+        self.assertContains(self.ana.get("/"), "Your request has been approved.")
         self.assertNotContains(self.marko.get("/"), "Dogovoreno")
         self.ana.post(f"/moji/{item.pk}/procitano/")
-        self.assertNotContains(self.ana.get("/"), "Vaš zahtjev je odobren.")
-        self.assertContains(self.ana.get("/moji/"), "Odobreno")
+        self.assertNotContains(self.ana.get("/"), "Your request has been approved.")
+        self.assertContains(self.ana.get("/moji/"), "Approved")
         self.assertContains(self.ana.get("/moji/"), "Dogovoreno")
         for client in self.clients.values():
             rows = client.get(self.url).context["rows"]
@@ -94,7 +94,7 @@ class TeamFlow(TestCase):
         item = self.ask()
         self.admin.post(f"/zahtjevi/{item.pk}/odluka/", {"choice":"rejected","comment":"Drugi termin"})
         page = self.ana.get("/moji/")
-        self.assertContains(page, "Odbijeno")
+        self.assertContains(page, "Declined")
         self.assertContains(page, "Drugi termin")
         item = self.ask()
         url = f"/moji/{item.pk}/povuci/"
@@ -124,7 +124,7 @@ class TeamFlow(TestCase):
         response = guest.post("/registracija/", {"name": "Lana", "email": credentials["username"],
                               "job_role": JobRole.objects.get(name="Video Editor").pk,
                               "password": credentials["password"], "is_staff": "1"}, follow=True)
-        self.assertContains(response, "Registracija je poslana")
+        self.assertContains(response, "Registration submitted")
         member = User.objects.get(username="lana@example.org")
         self.assertEqual(member.job.role.name, "Video Editor")
         self.assertFalse(member.is_staff)
@@ -134,7 +134,7 @@ class TeamFlow(TestCase):
         self.assertNotContains(self.ana.get("/"), "Lana")
         url = f"/tim/{member.pk}/odobri/"
         self.assertEqual(self.ana.post(url).status_code, 403)
-        self.assertContains(self.admin.get("/tim/"), "Odobri pristup")
+        self.assertContains(self.admin.get("/tim/"), "Approve access")
         self.admin.post(url)
         self.assertRedirects(guest.post("/prijava/", credentials), "/")
         self.assertEqual(guest.get("/tim/").status_code, 403)

@@ -8,21 +8,21 @@ DATE_FORMATS = ("%d.%m.%Y.", "%d.%m.%Y")
 
 
 class Period(forms.Form):
-    kind = forms.ChoiceField(label="Vrsta odsustva", choices=LEAVE)
-    start = forms.DateField(label="Od", input_formats=DATE_FORMATS, widget=forms.TextInput(attrs={"placeholder": "DD.MM.GGGG."}))
-    end = forms.DateField(label="Do", required=False, input_formats=DATE_FORMATS, help_text="Za jedan dan ostavite prazno.", widget=forms.TextInput(attrs={"placeholder": "DD.MM.GGGG."}))
+    kind = forms.ChoiceField(label="Leave type", choices=LEAVE)
+    start = forms.DateField(label="From", input_formats=DATE_FORMATS, widget=forms.TextInput(attrs={"placeholder": "DD.MM.YYYY."}))
+    end = forms.DateField(label="To", required=False, input_formats=DATE_FORMATS, help_text="Leave blank for a single day.", widget=forms.TextInput(attrs={"placeholder": "DD.MM.YYYY."}))
 
     def clean(self):
         data = super().clean()
         start = data.get("start")
         end = data["end"] = data.get("end") or start
         if start and end and (end < start or (end - start).days > 365):
-            raise forms.ValidationError("Izaberite period od jednog do 366 dana.")
+            raise forms.ValidationError("Choose a period between 1 and 366 days.")
         return data
 
 
 class Ask(Period):
-    note = forms.CharField(label="Napomena", required=False, max_length=2000, widget=forms.Textarea(attrs={"rows": 3}))
+    note = forms.CharField(label="Note", required=False, max_length=2000, widget=forms.Textarea(attrs={"rows": 3}))
 
 
 class People(forms.ModelMultipleChoiceField):
@@ -32,10 +32,10 @@ class People(forms.ModelMultipleChoiceField):
 
 class Entry(Period):
     field_order = ["kind", "holiday_name", "start", "end", "scope", "workers"]
-    holiday_name = forms.CharField(label="Naziv praznika (opciono)", max_length=100, required=False)
-    kind = forms.ChoiceField(label="Vrsta unosa", choices=KINDS)
-    scope = forms.ChoiceField(label="Obuhvat", choices=[("all", "Svi aktivni radnici"), ("selected", "Izabrana imena")])
-    workers = People(label="Izabrana imena", queryset=User.objects.filter(is_active=True).order_by("first_name", "username"), required=False, widget=forms.CheckboxSelectMultiple)
+    holiday_name = forms.CharField(label="Holiday name (optional)", max_length=100, required=False)
+    kind = forms.ChoiceField(label="Entry type", choices=KINDS)
+    scope = forms.ChoiceField(label="Applies to", choices=[("all", "All active team members"), ("selected", "Selected members")])
+    workers = People(label="Selected members", queryset=User.objects.filter(is_active=True).order_by("first_name", "username"), required=False, widget=forms.CheckboxSelectMultiple)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -44,31 +44,31 @@ class Entry(Period):
     def clean(self):
         data = super().clean()
         if data.get("scope") == "selected" and not data.get("workers"):
-            self.add_error("workers", "Izaberite barem jednu osobu.")
+            self.add_error("workers", "Select at least one team member.")
         return data
 
 
 class RoleSelection(forms.Form):
-    job_role = forms.ModelChoiceField(label="Poslovna rola", queryset=JobRole.objects.all(), empty_label="Izaberite rolu")
+    job_role = forms.ModelChoiceField(label="Job role", queryset=JobRole.objects.all(), empty_label="Select a role")
 
 
 class Member(RoleSelection):
-    name = forms.CharField(label="Ime i prezime", max_length=150)
-    username = forms.RegexField(label="Korisničko ime", regex=r"^[\w.@+-]+$", max_length=150)
-    password = forms.CharField(label="Lozinka", min_length=12, max_length=128, widget=forms.PasswordInput)
-    role = forms.ChoiceField(label="Ovlašćenja", choices=[("worker", "Član tima"), ("admin", "Administrator")])
+    name = forms.CharField(label="Full name", max_length=150)
+    username = forms.RegexField(label="Username", regex=r"^[\w.@+-]+$", max_length=150)
+    password = forms.CharField(label="Password", min_length=12, max_length=128, widget=forms.PasswordInput)
+    role = forms.ChoiceField(label="Access level", choices=[("worker", "Team member"), ("admin", "Administrator")])
 
 
 class Registration(RoleSelection):
-    name = forms.CharField(label="Ime i prezime", max_length=150)
-    email = forms.EmailField(label="E-mail", max_length=150)
-    password = forms.CharField(label="Lozinka", min_length=12, max_length=128, strip=False,
-                               help_text="Najmanje 12 znakova.", widget=forms.PasswordInput)
+    name = forms.CharField(label="Full name", max_length=150)
+    email = forms.EmailField(label="Email", max_length=150)
+    password = forms.CharField(label="Password", min_length=12, max_length=128, strip=False,
+                               help_text="Use at least 12 characters.", widget=forms.PasswordInput)
 
     def clean_email(self):
         email = self.cleaned_data["email"].lower()
         if User.objects.filter(username__iexact=email).exists():
-            raise forms.ValidationError("Ova adresa se već koristi.")
+            raise forms.ValidationError("This email address is already in use.")
         return email
 
 
