@@ -12,5 +12,7 @@ services:
         generateValue: true
       - key: HTTPS
         value: "1"
+      - key: GOOGLE_REDIRECT_ENABLED
+        value: "1"
       - key: GOOGLE_CLIENT_ID
         value: "289150898494-5b5ajb5oq9eialdsvl5h415unjctnhb8.apps.googleusercontent.com"
