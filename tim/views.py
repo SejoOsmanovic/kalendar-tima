@@ -263,6 +263,19 @@ def approval_scope(request, pk):
 
 @admin
 @require_POST
+def role_color(request, pk):
+    color = request.POST.get("color")
+    if color not in dict(JobRole.COLORS):
+        return HttpResponseBadRequest("Choose one of the available colors.")
+    role = get_object_or_404(JobRole, pk=pk)
+    role.color = color
+    role.save(update_fields=["color"])
+    messages.success(request, f"Color saved for {role.name}.")
+    return redirect("team")
+
+
+@admin
+@require_POST
 def add_role(request):
     name = request.POST.get("name", "").strip()
     color = request.POST.get("color", "")

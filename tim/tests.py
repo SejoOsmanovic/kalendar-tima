@@ -62,6 +62,16 @@ class TeamFlow(TestCase):
         self.ana.post("/trazi/", {"kind":"free", "start":"03.04.2027."})
         self.assertEqual(LeaveRequest.objects.latest("pk").start, date(2027, 4, 3))
 
+    def test_job_role_color(self):
+        role = JobRole.objects.get(name="Media Buyer")
+        url = f"/tim/role/{role.pk}/color/"
+        self.assertEqual(self.ana.post(url, {"color":"pink"}).status_code, 403)
+        self.assertEqual(self.admin.post(url, {"color":"invalid"}).status_code, 400)
+        page = self.admin.post(url, {"color":"pink"}, follow=True)
+        self.assertContains(page, 'class="tag role-pink">Media Buyer')
+        role.refresh_from_db()
+        self.assertEqual(role.color, "pink")
+
     def ask(self):
         self.ana.post("/trazi/", {"kind":"free","start":"06.11.2026.","note":"Privatna napomena"})
         return LeaveRequest.objects.latest("id")

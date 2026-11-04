@@ -21,6 +21,7 @@ urlpatterns = [
     path("tim/", views.team, name="team"),
     path("tim/<int:pk>/approval-roles/", views.approval_scope, name="approval_scope"),
     path("tim/role/", views.add_role, name="add_role"),
+    path("tim/role/<int:pk>/color/", views.role_color, name="role_color"),
     path("tim/<int:pk>/rola/", views.assign_role, name="assign_role"),
     path("tim/<int:pk>/administrator/", views.promote, name="promote"),
     path("tim/<int:pk>/arhiviraj/", views.archive, name="archive"),
