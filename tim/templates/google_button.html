@@ -1,0 +1,15 @@
+{% if google_client_id %}
+<form id="google-signin" action="{% url 'google_verify' %}" method="post">
+  {% csrf_token %}<input type="hidden" name="credential">
+  <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="submitGoogleSignIn" data-auto_prompt="false"></div>
+  <div class="g_id_signin" data-type="standard" data-text="continue_with" data-theme="outline"></div>
+</form>
+<script>
+  function submitGoogleSignIn(response) {
+    const form = document.getElementById("google-signin");
+    form.elements.credential.value = response.credential;
+    form.submit();
+  }
+</script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+{% endif %}

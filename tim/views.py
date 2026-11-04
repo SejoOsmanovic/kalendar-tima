@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from functools import wraps
 
 from django.contrib import messages
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -44,7 +45,7 @@ def preferences(request):
 
 def badge(request):
     if not request.user.is_authenticated:
-        return {}
+        return {"google_client_id": settings.GOOGLE_CLIENT_ID}
     context = {"date_format": "d.m.Y." if date_style(request.user) == "eu" else "m/d/Y",
                "decisions": LeaveRequest.objects.filter(worker=request.user, decision_seen=False,
                status__in=["approved", "rejected"]).order_by("-decided")}

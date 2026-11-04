@@ -1,9 +1,12 @@
 from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import path
 from . import views
+from . import google_login
 from .forms import TeamLogin
 
 urlpatterns = [
+    path("auth/google/verify/", google_login.verify, name="google_verify"),
+    path("auth/google/register/", google_login.register, name="google_register"),
     path("preferences/", views.preferences, name="preferences"),
     path("", views.calendar_view, name="calendar"),
     path("prijava/", LoginView.as_view(template_name="login.html", authentication_form=TeamLogin), name="login"),

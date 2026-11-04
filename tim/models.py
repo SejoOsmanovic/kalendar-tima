@@ -12,6 +12,11 @@ class DatePreference(models.Model):
     style = models.CharField(max_length=2, choices=FORMATS, default="us")
 
 
+class GoogleIdentity(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    subject = models.CharField(max_length=255, unique=True)
+
+
 class PendingRegistration(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="pending_registration")
 

@@ -99,6 +99,12 @@ class Registration(RoleSelection):
         return email
 
 
+class GoogleRegistration(RoleSelection):
+    first_name = forms.CharField(label="First name", max_length=150)
+    last_name = forms.CharField(label="Last name", max_length=150)
+    field_order = ["first_name", "last_name", "job_role"]
+
+
 class TeamLogin(AuthenticationForm):
     def clean_username(self):
         username = self.cleaned_data["username"]

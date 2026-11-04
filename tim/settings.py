@@ -4,6 +4,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = False
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 if os.getenv("RENDER_EXTERNAL_HOSTNAME"):
     ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
