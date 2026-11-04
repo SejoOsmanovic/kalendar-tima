@@ -1,0 +1,10 @@
+<details class="delete-request">
+  <summary aria-label="Delete request for {{ r.worker.get_full_name|default:r.worker.username }}" title="Delete request">×</summary>
+  <form method="post" action="{% url 'delete_request' r.pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="status" value="{{ r.status }}">
+    <input type="hidden" name="revision" value="{{ r.revision|stringformat:'d' }}">
+    <p>Permanently delete this request from the team and member’s lists?{% if r.status == "approved" %} Its approved days will also be removed from the calendar.{% endif %}</p>
+    <button>Delete request</button>
+  </form>
+</details>

@@ -7,6 +7,25 @@ from .models import Day, JobRole, LeaveRequest, MemberRole
 
 
 class UndoDecisionTest(TestCase):
+    def test_delete_approved_request_removes_only_its_days(self):
+        worker = User.objects.create_user("worker")
+        admin = User.objects.create_user("admin", is_staff=True)
+        day = date(2027, 3, 4)
+        item = LeaveRequest.objects.create(worker=worker, start=day, end=day, kind="free")
+        url = f"/zahtjevi/{item.pk}/delete/"
+        self.client.force_login(worker)
+        self.assertEqual(self.client.post(url, {"status":"pending", "revision":"0"}).status_code, 403)
+        self.client.force_login(admin)
+        self.assertContains(self.client.get("/zahtjevi/"), url)
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.client.post(f"/zahtjevi/{item.pk}/odluka/", {"choice":"approved"})
+        unrelated = Day.objects.create(worker=admin, date=day, kind="holiday")
+        self.client.post(url, {"status":"pending", "revision":"0"})
+        self.assertTrue(Day.objects.filter(source=item).exists())
+        self.client.post(url, {"status":"approved", "revision":"0"})
+        self.assertFalse(LeaveRequest.objects.filter(pk=item.pk).exists())
+        self.assertEqual(list(Day.objects.values_list("pk", flat=True)), [unrelated.pk])
+
     def test_only_full_admin_can_reverse_and_correct_decisions(self):
         worker = User.objects.create_user("worker")
         approver = User.objects.create_user("approver")

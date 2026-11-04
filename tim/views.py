@@ -235,6 +235,22 @@ def decide(request, pk):
 
 @admin
 @require_POST
+def delete_request(request, pk):
+    with transaction.atomic():
+        item = LeaveRequest.objects.select_for_update().filter(pk=pk).first()
+        if not item:
+            messages.info(request, "This request has already been deleted.")
+        elif item.status != request.POST.get("status") or str(item.revision) != request.POST.get("revision"):
+            messages.info(request, "The request has changed. Review it before deleting.")
+        else:
+            Day.objects.filter(source=item).delete()
+            item.delete()
+            messages.success(request, "Request deleted.")
+    return redirect("queue")
+
+
+@admin
+@require_POST
 def undo_decision(request, pk):
     with transaction.atomic():
         item = get_object_or_404(LeaveRequest.objects.select_for_update(), pk=pk)

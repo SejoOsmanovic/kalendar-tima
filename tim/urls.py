@@ -21,6 +21,7 @@ urlpatterns = [
     path("moji/<int:pk>/procitano/", views.acknowledge, name="acknowledge"),
     path("moji/<int:pk>/povuci/", views.withdraw, name="withdraw"),
     path("zahtjevi/", views.queue, name="queue"),
+    path("zahtjevi/<int:pk>/delete/", views.delete_request, name="delete_request"),
     path("zahtjevi/<int:pk>/undo/", views.undo_decision, name="undo_decision"),
     path("zahtjevi/<int:pk>/odluka/", views.decide, name="decide"),
     path("tim/", views.team, name="team"),
