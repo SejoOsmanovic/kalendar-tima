@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kalendar
+      POSTGRES_USER: kalendar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Postavite lozinku baze}
+    volumes:
+      - baza:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kalendar -d kalendar"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+  proxy:
+    image: caddy:2-alpine
+    profiles: [https]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certifikati:/data
+      - caddy_config:/config
+    depends_on: [web]
+volumes:
+  baza:
+  certifikati:
+  caddy_config:

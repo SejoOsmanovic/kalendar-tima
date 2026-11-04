@@ -1,0 +1,9 @@
+.venv/
+.deps/
+.env
+.env.*
+!.env.example
+*.sqlite3
+__pycache__/
+*.dump
+staticfiles/

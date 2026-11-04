@@ -1,0 +1,11 @@
+{% load static %}<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}Kalendar tima{% endblock %}</title><link rel="stylesheet" href="{% static 'tim.css' %}"></head><body>
+<header><div class="bar"><a class="brand" href="/"><span class="icon">▦</span> Kalendar tima</a>{% if user.is_authenticated %}<nav aria-label="Glavni meni"><a href="/">Kalendar</a><a href="/moji/">Moji zahtjevi</a>{% if user.is_staff %}<a href="/zahtjevi/">Zahtjevi <b>{{ pending }}</b></a><a href="/tim/">Tim</a>{% endif %}</nav><form method="post" action="/odjava/">{% csrf_token %}<span>{{ user.get_full_name|default:user.username }}</span> <button class="light">Odjava</button></form>{% endif %}</div></header>
+<main>{% for message in messages %}<p class="notice" role="status">{{ message }}</p>{% endfor %}
+{% for decision in decisions %}
+<section class="notice{% if decision.status == 'rejected' %} rejected{% endif %}" aria-label="Obavještenje o zahtjevu">
+<strong>Vaš zahtjev je {% if decision.status == "approved" %}odobren{% else %}odbijen{% endif %}.</strong>
+<p>{{ decision.get_kind_display }} · {{ decision.start|date:"d.m.Y." }}{% if decision.end != decision.start %} – {{ decision.end|date:"d.m.Y." }}{% endif %}</p>
+{% if decision.comment %}<p>Komentar administratora · {{ decision.comment }}</p>{% endif %}
+<form method="post" action="{% url 'acknowledge' decision.pk %}">{% csrf_token %}<button class="light">Označi kao pročitano</button></form>
+</section>{% endfor %}
+{% block body %}{% endblock %}</main></body></html>
