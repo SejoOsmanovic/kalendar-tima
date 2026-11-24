@@ -79,7 +79,13 @@ Create a Web application client in Google Auth Platform. Add the site's HTTPS or
 
 New Google users review or complete the first and last names suggested by Google, select a job role and await administrator approval. Existing password accounts keep their original sign-in method.
 
-## Checks
+## Annual leave balances
+
+Administrators use **Team → Annual leave balance → Set annual allowance** to assign totals per person and calendar year. The form suggests 5 Days off and 5 Sick days; nothing is granted until an administrator saves it. Holiday allowance is entered separately. Employees use **My balance**; scoped approvers may view balances of members in their assigned roles but cannot edit allowances.
+
+Days off combines historical Day off and Vacation entries. Existing custom types named Sick day/Sick days are classified as sick leave while retaining their calendar color. New requests offer Days off or Sick days. Only Monday–Friday calendar entries consume allowance, regardless of PTO; holidays use their own category. Today and earlier dates are used, future approved dates are reserved. Pending, declined and withdrawn requests do not consume days. Undoing/deleting an approved request restores its days. Cross-year periods are split by date. There is no automatic carry-over or hard approval limit: excess usage is displayed as a negative remaining balance. Allowance edits replace annual totals and do not create calendar entries.
+
+## Running checks
 
 ```sh
 docker compose exec web python manage.py check

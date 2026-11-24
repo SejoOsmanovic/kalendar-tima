@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-LEAVE = [("free", "Day off"), ("vacation", "Vacation")]
+LEAVE = [("free", "Days off"), ("sick", "Sick days")]
 KINDS = LEAVE + [("holiday", "Holiday"), ("closed", "Company closure")]
 STATES = [("pending", "Pending"), ("approved", "Approved"), ("rejected", "Declined"), ("withdrawn", "Withdrawn")]
 
@@ -46,7 +46,7 @@ class LeaveRequest(models.Model):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     start = models.DateField()
     end = models.DateField()
-    kind = models.CharField(max_length=12, choices=LEAVE)
+    kind = models.CharField(max_length=12, choices=LEAVE + [("vacation", "Days off")])
     note = models.TextField(blank=True)
     status = models.CharField(max_length=12, choices=STATES, default="pending")
     comment = models.TextField(blank=True)
@@ -85,13 +85,15 @@ class Day(models.Model):
     is_paid = models.BooleanField(null=True)
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     date = models.DateField(db_index=True)
-    kind = models.CharField(max_length=12, choices=KINDS + [("custom", "Custom entry")])
+    kind = models.CharField(max_length=12, choices=KINDS + [("vacation", "Days off"), ("custom", "Custom entry")])
     entry_type = models.ForeignKey(EntryType, null=True, blank=True, on_delete=models.PROTECT)
     holiday_name = models.CharField(max_length=100, blank=True, default="")
     source = models.ForeignKey(LeaveRequest, null=True, on_delete=models.PROTECT)
 
     @property
     def badge_class(self):
+        if self.kind == "vacation":
+            return "free"
         return self.entry_type.badge_class if self.entry_type_id else self.kind
 
     @property
@@ -104,3 +106,14 @@ class Day(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["worker", "date"], name="one_absence_per_day")]
+
+
+class AnnualAllowance(models.Model):
+    worker = models.ForeignKey(User, on_delete=models.CASCADE)
+    year = models.PositiveIntegerField()
+    days_off = models.PositiveIntegerField(default=5)
+    sick_days = models.PositiveIntegerField(default=5)
+    holidays = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["worker", "year"], name="one_allowance_per_year")]

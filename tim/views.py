@@ -17,6 +17,9 @@ from django.views.decorators.http import require_POST
 
 from .forms import Ask, Entry, Member, Registration, RoleSelection, ApprovalScope, DateSettings
 from .models import Day, KINDS, LeaveRequest, PendingRegistration, JobRole, MemberRole, EntryType, DatePreference
+from .models import AnnualAllowance
+from .forms import AllowanceSettings
+from .balances import balances
 
 MONTHS = "January February March April May June July August September October November December".split()
 
@@ -78,6 +81,37 @@ def admin(view):
 
 def name(user):
     return user.get_full_name() or user.username
+
+
+@login_required
+def leave_balance(request, pk=None):
+    member = get_object_or_404(User, pk=pk or request.user.pk)
+    if member.pk != request.user.pk and not request.user.is_staff:
+        if not JobRole.objects.filter(approvers=request.user, memberrole__user=member).exists():
+            raise PermissionDenied
+    try:
+        year = int(request.GET.get("year", timezone.localdate().year))
+        if not 2000 <= year <= 9998:
+            raise ValueError
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest("Invalid year.")
+    allowance = AnnualAllowance.objects.filter(worker=member, year=year).first()
+    initial = {"year": year}
+    if allowance:
+        initial.update({key: getattr(allowance, key) for key in ("days_off", "sick_days", "holidays")})
+    form = AllowanceSettings(request.POST if request.method == "POST" else None, initial=initial)
+    if request.method == "POST":
+        if not request.user.is_staff:
+            raise PermissionDenied
+        if form.is_valid():
+            data = form.cleaned_data.copy()
+            saved_year = data.pop("year")
+            AnnualAllowance.objects.update_or_create(worker=member, year=saved_year, defaults=data)
+            messages.success(request, "Annual allowance saved.")
+            return redirect(reverse("member_balance", args=[member.pk]) + f"?year={saved_year}")
+    return render(request, "balance.html", {"member": member, "year": year, "form": form,
+        "balance_rows": balances(member, year),
+        "history": Day.objects.filter(worker=member, date__year=year, kind__in=["free", "vacation", "sick", "holiday"]).order_by("date")})
 
 
 @login_required
@@ -152,7 +186,7 @@ def entry(request):
             messages.error(request, "Choose a color from the list.")
         elif not label or len(label) > 60:
             messages.error(request, "Enter a type name of up to 60 characters.")
-        elif label.casefold() in {text.casefold() for _, text in KINDS}:
+        elif label.casefold() in {text.casefold() for _, text in KINDS} | {"sick day", "day off", "vacation"}:
             messages.error(request, "An entry type with this name already exists.")
         else:
             try:

@@ -10,3 +10,5 @@
 .day .paid-entry{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px}
 .paid-entry .absence-name{flex:1 1 5ch;min-width:0;overflow-wrap:anywhere}
 .paid-entry .pto-mark{flex:none;margin-inline-start:auto}
+
+.sick{background:#d9f1ef;color:#145951}.balance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:20px 0}.balance-total{font-size:2rem;font-weight:700}.balance-total small{font-size:1rem;font-weight:400}

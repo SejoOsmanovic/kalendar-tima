@@ -13,6 +13,13 @@ class DateSettings(forms.Form):
     style = forms.ChoiceField(label="Date format", choices=DatePreference.FORMATS)
 
 
+class AllowanceSettings(forms.Form):
+    year = forms.IntegerField(min_value=2000, max_value=9998)
+    days_off = forms.IntegerField(label="Days off", min_value=0, max_value=366, initial=5)
+    sick_days = forms.IntegerField(label="Sick days", min_value=0, max_value=366, initial=5)
+    holidays = forms.IntegerField(label="Holidays", min_value=0, max_value=366, initial=0)
+
+
 class Period(forms.Form):
     kind = forms.ChoiceField(label="Leave type", choices=LEAVE)
     start = forms.DateField(label="From", input_formats=DATE_FORMATS, widget=forms.TextInput(attrs={"placeholder": "DD.MM.YYYY."}))
@@ -63,7 +70,8 @@ class Entry(Period):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["kind"].choices = KINDS + [(f"custom-{pk}", name) for pk, name in EntryType.objects.values_list("pk", "name")]
+        self.fields["kind"].choices = KINDS + [(f"custom-{pk}", name) for pk, name in EntryType.objects.values_list("pk", "name")
+            if name.strip().casefold() not in {"sick day", "sick days"}]
 
     def clean(self):
         data = super().clean()

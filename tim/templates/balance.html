@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block body %}
+<small>ANNUAL LEAVE</small>
+<h1>{{ member.get_full_name|default:member.username }} · {{ year|stringformat:'d' }}</h1>
+<form method="get" class="actions"><label>Year <input type="number" name="year" min="2000" max="9998" value="{{ year|stringformat:'d' }}" required></label><button>Show year</button></form>
+<div class="balance-grid">
+{% for b in balance_rows %}<section class="panel pad">
+<h2>{{ b.label }}</h2>
+<p class="balance-total">{% if b.remaining != None %}{{ b.remaining }} <small>remaining</small>{% else %}Not assigned{% endif %}</p>
+<p>Annual allowance: {% if b.total != None %}{{ b.total }}{% else %}Not set{% endif %}</p>
+<p>{{ b.used }} used · {{ b.reserved }} reserved</p>
+{% if b.remaining != None and b.remaining < 0 %}<p role="status">Allowance exceeded by approved calendar entries.</p>{% endif %}
+</section>{% endfor %}
+</div>
+<p>Only Monday–Friday counts. Used includes today; reserved means approved future dates. Pending requests do not reduce your balance. Holidays have a separate allowance. PTO is a pay label and does not change the day count.</p>
+<p>Allowances are set separately for each calendar year. There is no automatic carry-over. Calendar entries remain visible on weekends but do not use allowance. Balances track usage; they do not block approval when an allowance is exceeded.</p>
+{% if user.is_staff %}<details class="panel pad" {% if form.errors %}open{% endif %}><summary>Set annual allowance</summary><form method="post">{% csrf_token %}{{ form.as_p }}<p>These are annual totals, not extra days. Saving does not create calendar entries.</p><button>Save allowance</button></form>{% if form.errors %}<p role="alert">Please correct the allowance values.</p>{% endif %}</details>{% endif %}
+<section class="panel pad"><h2>Approved and scheduled days</h2>
+{% for day in history %}<div class="record"><span>{{ day.date|date:date_format }} · <span class="tag {{ day.badge_class }}">{{ day.label }}</span></span><span>{% if day.date.weekday < 5 %}1 day{% else %}Weekend · not counted{% endif %}</span></div>{% empty %}<p>No days recorded for this year.</p>{% endfor %}
+</section>
+{% endblock %}

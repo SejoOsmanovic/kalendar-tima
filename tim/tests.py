@@ -29,7 +29,7 @@ class TeamFlow(TestCase):
         page = self.marko.get(url)
         self.assertEqual([row.worker_id for row in page.context["rows"]], [ana.pk])
         cell = next(c for c in page.context["cells"] if c["date"] == self.friday)
-        self.assertEqual(cell["kinds"], [("free", "Day off", False)])
+        self.assertEqual(cell["kinds"], [("free", "Days off", False)])
         self.assertContains(page, f'&amp;rola={editor.pk}"')
         self.assertFalse(self.marko.get(url + f"&osoba={marko.pk}").context["rows"])
 
@@ -77,7 +77,7 @@ class TeamFlow(TestCase):
         return LeaveRequest.objects.latest("id")
 
     def test_friday(self):
-        self.admin.post("/unos/", {"kind":"vacation","start":"06.11.2026.","scope":"selected","workers":[User.objects.get(username="Marko").pk]})
+        self.admin.post("/unos/", {"kind":"free","start":"06.11.2026.","scope":"selected","workers":[User.objects.get(username="Marko").pk]})
         item = self.ask()
         decision = f"/zahtjevi/{item.pk}/odluka/"
         self.assertContains(self.ana.get("/moji/"), "Pending")
@@ -88,7 +88,7 @@ class TeamFlow(TestCase):
         for client in (self.admin, self.other):
             page = client.get("/zahtjevi/")
             self.assertContains(page, "Privatna napomena")
-            self.assertContains(page, "Marko · 11/06/2026 · Vacation")
+            self.assertContains(page, "Marko · 11/06/2026 · Days off")
         self.admin.post(decision, {"choice":"approved","comment":"Dogovoreno"})
         second = self.other.post(decision, {"choice":"rejected"}, follow=True)
         self.assertContains(second, "already been reviewed")
@@ -104,7 +104,7 @@ class TeamFlow(TestCase):
         self.assertContains(self.ana.get("/moji/"), "Dogovoreno")
         for client in self.clients.values():
             rows = client.get(self.url).context["rows"]
-            self.assertEqual({(r.worker.username,r.kind) for r in rows}, {("Ana","free"),("Marko","vacation")})
+            self.assertEqual({(r.worker.username,r.kind) for r in rows}, {("Ana","free"),("Marko","free")})
         duplicate = self.ask()
         self.admin.post(f"/zahtjevi/{duplicate.pk}/odluka/", {"choice":"approved"})
         duplicate.refresh_from_db()

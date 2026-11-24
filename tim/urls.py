@@ -5,6 +5,8 @@ from . import google_login
 from .forms import TeamLogin
 
 urlpatterns = [
+    path("balances/", views.leave_balance, name="my_balance"),
+    path("tim/<int:pk>/balances/", views.leave_balance, name="member_balance"),
     path("auth/google/verify/", google_login.verify, name="google_verify"),
     path("auth/google/return/", google_login.google_return, name="google_return"),
     path("auth/google/register/", google_login.register, name="google_register"),
