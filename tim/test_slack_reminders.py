@@ -1,0 +1,139 @@
+from datetime import date, datetime, timezone
+from unittest.mock import Mock, patch
+
+from django.contrib.auth.models import User
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
+
+from .models import Day, LeaveRequest, SlackReminderDelivery
+
+
+@override_settings(
+    TIME_ZONE="Europe/Sarajevo",
+    SLACK_REMINDER_KEY="scheduler-test-key",
+    SLACK_BOT_TOKEN="xoxb-test-token",
+    SLACK_RECIPIENT_ID="UOWNER1",
+)
+class SlackReminderTests(TestCase):
+    friday_afternoon = datetime(2026, 11, 27, 16, 5, tzinfo=timezone.utc)
+    monday = date(2026, 11, 30)
+
+    def setUp(self):
+        self.scheduler = Client(
+            enforce_csrf_checks=True,
+            headers={"authorization": "Bearer scheduler-test-key"},
+        )
+        self.endpoint = reverse("slack_reminder")
+        self.test_endpoint = reverse("slack_reminder_test")
+        self.slack = self.enterContext(patch("tim.slack_reminders.requests.post"))
+        self.slack.side_effect = self.slack_response
+
+    def slack_response(self, url, **kwargs):
+        response = Mock()
+        if url.endswith("/conversations.open"):
+            response.json.return_value = {
+                "ok": True,
+                "channel": {"id": "DPRIVATE1", "is_im": True, "user": "UOWNER1"},
+            }
+        else:
+            response.json.return_value = {"ok": True}
+        return response
+
+    def add_day(self, username, kind, target=None, status=None, **user_fields):
+        worker = User.objects.create_user(username, **user_fields)
+        when = target or self.monday
+        source = None
+        if status:
+            source = LeaveRequest.objects.create(
+                worker=worker, start=when, end=when, kind=kind, status=status, note="Private note",
+            )
+        return Day.objects.create(worker=worker, date=when, kind=kind, source=source)
+
+    def test_friday_rolls_forward_to_monday_and_sends_one_private_summary(self):
+        self.add_day("ana", "free", status="approved", first_name="Ana <@UOTHER>")
+        self.add_day("marko", "vacation", first_name="Marko")
+        self.add_day("weekend", "free", date(2026, 11, 28))
+        self.add_day("archived", "free", is_active=False)
+        self.add_day("holiday", "holiday")
+        self.add_day("sick", "sick")
+        self.add_day("pending", "free", status="pending")
+
+        with patch("tim.slack_reminders.timezone.now", return_value=self.friday_afternoon):
+            self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+            self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+
+        self.assertEqual(self.slack.call_count, 2)
+        open_dm, post_message = self.slack.call_args_list
+        self.assertEqual(open_dm.args[0], "https://slack.com/api/conversations.open")
+        self.assertEqual(open_dm.kwargs["json"]["users"], "UOWNER1")
+        self.assertEqual(post_message.args[0], "https://slack.com/api/chat.postMessage")
+        payload = post_message.kwargs["json"]
+        self.assertEqual(payload["channel"], "DPRIVATE1")
+        self.assertIn("Monday, November 30, 2026", payload["text"])
+        self.assertIn("Ana &lt;@UOTHER&gt;", payload["text"])
+        self.assertIn("Marko", payload["text"])
+        self.assertIn("?dan=2026-11-30", payload["text"])
+        for excluded in ("weekend", "archived", "holiday", "sick", "pending", "Private note"):
+            self.assertNotIn(excluded, payload["text"])
+        self.assertTrue(SlackReminderDelivery.objects.filter(absence_date=self.monday).exists())
+
+    def test_regular_workday_empty_days_and_weekend(self):
+        self.add_day("tuesday", "free", date(2026, 12, 1))
+        times_without_reminders = (
+            datetime(2026, 11, 28, 16, 5, tzinfo=timezone.utc),  # Saturday
+            datetime(2026, 11, 30, 8, 0, tzinfo=timezone.utc),  # Monday morning
+            datetime(2026, 12, 1, 16, 5, tzinfo=timezone.utc),  # No absences on Wednesday
+        )
+        for now in times_without_reminders:
+            with patch("tim.slack_reminders.timezone.now", return_value=now):
+                self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+        self.slack.assert_not_called()
+
+        monday_afternoon = datetime(2026, 11, 30, 16, 5, tzinfo=timezone.utc)
+        with patch("tim.slack_reminders.timezone.now", return_value=monday_afternoon):
+            self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+        self.assertIn("Tuesday, December 1, 2026", self.slack.call_args.kwargs["json"]["text"])
+
+    def test_missing_key_and_site_user_cannot_trigger_delivery(self):
+        admin = User.objects.create_user("admin", is_staff=True)
+        self.client.force_login(admin)
+        self.assertEqual(self.client.post(self.test_endpoint).status_code, 403)
+        self.assertEqual(self.scheduler.get(self.test_endpoint).status_code, 405)
+        with self.settings(SLACK_REMINDER_KEY=""):
+            self.assertEqual(self.scheduler.post(self.test_endpoint).status_code, 403)
+        self.slack.assert_not_called()
+
+    def test_manual_test_has_no_employee_data_and_does_not_mark_delivery(self):
+        self.add_day("private-employee-name", "free")
+        self.assertEqual(self.scheduler.post(self.test_endpoint).status_code, 204)
+        payload = self.slack.call_args.kwargs["json"]
+        self.assertIn("Test from Scale Up Vacation Tracker", payload["text"])
+        self.assertNotIn("private-employee-name", payload["text"])
+        self.assertFalse(SlackReminderDelivery.objects.exists())
+
+    def test_mismatched_dm_is_rejected(self):
+        response = Mock()
+        response.json.return_value = {
+            "ok": True,
+            "channel": {"id": "DOTHER1", "is_im": True, "user": "UOTHER"},
+        }
+        self.slack.side_effect = None
+        self.slack.return_value = response
+        with self.assertLogs("tim.slack_reminders", level="WARNING"):
+            self.assertEqual(self.scheduler.post(self.test_endpoint).status_code, 502)
+        self.assertEqual(self.slack.call_count, 1)
+
+    def test_failed_delivery_can_be_retried(self):
+        self.add_day("ana", "free")
+        failed = Mock()
+        failed.json.return_value = {"ok": False, "error": "internal_error"}
+        self.slack.side_effect = [self.slack_response("https://slack.com/api/conversations.open"), failed]
+
+        with patch("tim.slack_reminders.timezone.now", return_value=self.friday_afternoon):
+            with self.assertLogs("tim.slack_reminders", level="WARNING"):
+                self.assertEqual(self.scheduler.post(self.endpoint).status_code, 502)
+            self.assertFalse(SlackReminderDelivery.objects.exists())
+            self.slack.side_effect = self.slack_response
+            self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+
+        self.assertTrue(SlackReminderDelivery.objects.filter(absence_date=self.monday).exists())

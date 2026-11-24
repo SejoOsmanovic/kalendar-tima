@@ -117,3 +117,8 @@ class AnnualAllowance(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["worker", "year"], name="one_allowance_per_year")]
+
+
+class SlackReminderDelivery(models.Model):
+    absence_date = models.DateField(unique=True)
+    sent_at = models.DateTimeField(auto_now_add=True)

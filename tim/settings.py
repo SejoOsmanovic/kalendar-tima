@@ -6,6 +6,9 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = False
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_REDIRECT_ENABLED = os.getenv("GOOGLE_REDIRECT_ENABLED") == "1"
+SLACK_REMINDER_KEY = os.getenv("SLACK_REMINDER_KEY", "")
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN", "")
+SLACK_RECIPIENT_ID = os.getenv("SLACK_RECIPIENT_ID", "")
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 if os.getenv("RENDER_EXTERNAL_HOSTNAME"):

@@ -1,0 +1,54 @@
+name: Slack days off reminder
+
+on:
+  schedule:
+    - cron: "5 17 * * 1-5"
+      timezone: Europe/Sarajevo
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: slack-days-off-reminder
+  cancel-in-progress: false
+
+jobs:
+  send:
+    if: github.event_name == 'workflow_dispatch' || vars.SLACK_REMINDERS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request the Slack reminder
+        env:
+          SLACK_REMINDER_KEY: ${{ secrets.SLACK_REMINDER_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$SLACK_REMINDER_KEY" ]]; then
+            echo "::error::Set the SLACK_REMINDER_KEY repository secret first."
+            exit 1
+          fi
+
+          endpoint="https://scale-up-vacation-tracker.onrender.com/integrations/slack/reminder/"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            endpoint+="test/"
+          fi
+
+          # A sleeping Render service can initially answer with a loading page or time out.
+          for attempt in 1 2 3; do
+            status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              --connect-timeout 10 --max-time 75 --request POST \
+              --header "Authorization: Bearer $SLACK_REMINDER_KEY" "$endpoint") || status=000
+            case "$status" in
+              204) exit 0 ;;
+              403) echo "::error::The reminder key on Render must match the GitHub secret."; exit 1 ;;
+              409) echo "::error::Set a Slack bot token and member ID on Render."; exit 1 ;;
+              000|200|500|502|503|504) ;;
+              *) break ;;
+            esac
+            if [[ "$attempt" != 3 ]]; then
+              sleep 10
+            fi
+          done
+
+          echo "::error::Reminder request returned HTTP $status. Check the Render service logs."
+          exit 1

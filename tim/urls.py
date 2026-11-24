@@ -1,10 +1,12 @@
 from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import path
 from . import views
-from . import google_login
+from . import google_login, slack_reminders
 from .forms import TeamLogin
 
 urlpatterns = [
+    path("integrations/slack/reminder/", slack_reminders.reminder, name="slack_reminder"),
+    path("integrations/slack/reminder/test/", slack_reminders.reminder, {"test_message": True}, name="slack_reminder_test"),
     path("balances/", views.leave_balance, name="my_balance"),
     path("tim/<int:pk>/balances/", views.leave_balance, name="member_balance"),
     path("auth/google/verify/", google_login.verify, name="google_verify"),
