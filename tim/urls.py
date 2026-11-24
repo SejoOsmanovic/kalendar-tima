@@ -6,7 +6,8 @@ from .forms import TeamLogin
 
 urlpatterns = [
     path("integrations/slack/reminder/", slack_reminders.reminder, name="slack_reminder"),
-    path("integrations/slack/reminder/test/", slack_reminders.reminder, {"test_message": True}, name="slack_reminder_test"),
+    path("integrations/slack/reminder/test/", slack_reminders.reminder, {"sample": "single"}, name="slack_reminder_test"),
+    path("integrations/slack/reminder/test/group/", slack_reminders.reminder, {"sample": "group"}, name="slack_reminder_test_group"),
     path("balances/", views.leave_balance, name="my_balance"),
     path("tim/<int:pk>/balances/", views.leave_balance, name="member_balance"),
     path("auth/google/verify/", google_login.verify, name="google_verify"),

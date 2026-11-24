@@ -20,6 +20,21 @@ from .models import Day, SlackReminderDelivery
 
 logger = logging.getLogger(__name__)
 
+CROWDED_SAMPLE_NAMES = (
+    "Ari Linden",
+    "Casey Vale",
+    "Dana Mercer",
+    "Emery Reed",
+    "Finley Wells",
+    "Harper Bell",
+    "Jules Rowan",
+    "Kai Banks",
+    "Mika Lane",
+    "Noa Ellis",
+    "Quinn Brooks",
+    "Riley Hart",
+)
+
 
 class SlackDeliveryError(Exception):
     pass
@@ -110,7 +125,7 @@ def send_next_workday_reminder(request):
 @csrf_exempt
 @require_POST
 @never_cache
-def reminder(request, test_message=False):
+def reminder(request, sample=None):
     key = settings.SLACK_REMINDER_KEY
     if not key or not constant_time_compare(request.headers.get("Authorization", ""), f"Bearer {key}"):
         return HttpResponse(status=403)
@@ -118,9 +133,10 @@ def reminder(request, test_message=False):
         return HttpResponse(status=409)
 
     try:
-        if test_message:
-            sample = format_reminder(next_workday(timezone.localdate()), ["Sample team member"])
-            send_dm(f"TEST · {sample}\n\nSample reminder from Scale Up Vacation Tracker.")
+        if sample:
+            names = CROWDED_SAMPLE_NAMES if sample == "group" else ("Sample team member",)
+            message = format_reminder(next_workday(timezone.localdate()), names)
+            send_dm(f"TEST · {message}\n\nFictional team data from Scale Up Vacation Tracker.")
         else:
             send_next_workday_reminder(request)
     except SlackDeliveryError as exc:

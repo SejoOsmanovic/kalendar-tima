@@ -5,6 +5,11 @@ on:
     - cron: "5 17 * * 1-5"
       timezone: Europe/Sarajevo
   workflow_dispatch:
+    inputs:
+      busy_calendar:
+        description: Use the busy calendar sample with 12 fictional team members
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -21,6 +26,7 @@ jobs:
       - name: Request the Slack reminder
         env:
           SLACK_REMINDER_KEY: ${{ secrets.SLACK_REMINDER_KEY }}
+          BUSY_CALENDAR: ${{ inputs.busy_calendar }}
         shell: bash
         run: |
           if [[ -z "$SLACK_REMINDER_KEY" ]]; then
@@ -31,6 +37,9 @@ jobs:
           endpoint="https://scale-up-vacation-tracker.onrender.com/integrations/slack/reminder/"
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             endpoint+="test/"
+            if [[ "$BUSY_CALENDAR" == "true" ]]; then
+              endpoint+="group/"
+            fi
           fi
 
           # A sleeping Render service can initially answer with a loading page or time out.

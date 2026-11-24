@@ -6,6 +6,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from .models import Day, LeaveRequest, SlackReminderDelivery
+from .slack_reminders import CROWDED_SAMPLE_NAMES
 
 
 @override_settings(
@@ -111,6 +112,17 @@ class SlackReminderTests(TestCase):
         self.assertIn("TEST · Days off on Monday, November 30, 2026", payload["text"])
         self.assertIn("Sample team member", payload["text"])
         self.assertNotIn("private-employee-name", payload["text"])
+        self.assertFalse(SlackReminderDelivery.objects.exists())
+
+        with patch("tim.slack_reminders.timezone.now", return_value=self.friday_afternoon):
+            self.assertEqual(self.scheduler.post(reverse("slack_reminder_test_group")).status_code, 204)
+        group_text = self.slack.call_args.kwargs["json"]["text"]
+        self.assertIn("TEST · Days off on Monday, November 30, 2026", group_text)
+        self.assertEqual(
+            [line.removeprefix("• ") for line in group_text.splitlines() if line.startswith("• ")],
+            list(CROWDED_SAMPLE_NAMES),
+        )
+        self.assertNotIn("private-employee-name", group_text)
         self.assertFalse(SlackReminderDelivery.objects.exists())
 
     def test_mismatched_dm_is_rejected(self):
