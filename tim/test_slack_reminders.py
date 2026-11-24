@@ -5,8 +5,8 @@ from django.contrib.auth.models import User
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from .models import Day, LeaveRequest, SlackReminderDelivery
-from .slack_reminders import CROWDED_SAMPLE_NAMES
+from .models import Day, JobRole, LeaveRequest, MemberRole, SlackReminderDelivery, SlackSubscription
+from .slack_reminders import CROWDED_SAMPLE_NAMES, SlackDeliveryError
 
 
 @override_settings(
@@ -151,3 +151,63 @@ class SlackReminderTests(TestCase):
             self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
 
         self.assertTrue(SlackReminderDelivery.objects.filter(absence_date=self.monday).exists())
+
+    def test_full_admin_and_lead_receive_only_their_current_scope(self):
+        full_admin = User.objects.create_user("owner", is_staff=True)
+        editor_lead = User.objects.create_user("editor-lead")
+        worker = User.objects.create_user("ordinary-member")
+        for user, member_id in [(full_admin, "UOWNER1"), (editor_lead, "ULEAD1"), (worker, "UWORKER1")]:
+            SlackSubscription.objects.create(user=user, member_id=member_id)
+
+        editor_role = JobRole.objects.get(name="Video Editor")
+        buyer_role = JobRole.objects.get(name="Media Buyer")
+        editor_role.approvers.add(editor_lead)
+        editor = self.add_day("editor", "free", first_name="Video editor").worker
+        buyer = self.add_day("buyer", "free", first_name="Media buyer").worker
+        MemberRole.objects.create(user=editor, role=editor_role)
+        MemberRole.objects.create(user=buyer, role=buyer_role)
+        Day.objects.create(worker=editor, date=date(2026, 12, 1), kind="free")
+        Day.objects.create(worker=buyer, date=date(2026, 12, 1), kind="free")
+
+        with patch("tim.slack_reminders.send_dm") as send:
+            with patch("tim.slack_reminders.timezone.now", return_value=self.friday_afternoon):
+                self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+                self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+            summaries = {call.kwargs["recipient"]: call.args[0] for call in send.call_args_list}
+            self.assertEqual(send.call_count, 2)
+            self.assertEqual(set(summaries), {"UOWNER1", "ULEAD1"})
+            self.assertIn("Video editor", summaries["UOWNER1"])
+            self.assertIn("Media buyer", summaries["UOWNER1"])
+            self.assertIn("Video editor", summaries["ULEAD1"])
+            self.assertNotIn("Media buyer", summaries["ULEAD1"])
+
+            buyer_role.approvers.add(editor_lead)
+            send.reset_mock()
+            with patch("tim.slack_reminders.timezone.now", return_value=datetime(2026, 11, 30, 16, 5, tzinfo=timezone.utc)):
+                self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+            summaries = {call.kwargs["recipient"]: call.args[0] for call in send.call_args_list}
+            self.assertIn("Video editor", summaries["ULEAD1"])
+            self.assertIn("Media buyer", summaries["ULEAD1"])
+
+    def test_paused_linked_legacy_account_does_not_receive_a_fallback(self):
+        owner = User.objects.create_user("owner", is_staff=True)
+        SlackSubscription.objects.create(user=owner, member_id="UOWNER1", enabled=False)
+        self.add_day("ana", "free")
+        with patch("tim.slack_reminders.timezone.now", return_value=self.friday_afternoon):
+            self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+        self.slack.assert_not_called()
+
+    def test_delivery_retries_only_the_recipient_that_failed(self):
+        admin = User.objects.create_user("second-admin", is_staff=True)
+        SlackSubscription.objects.create(user=admin, member_id="UADMIN2")
+        self.add_day("ana", "free")
+        with patch("tim.slack_reminders.timezone.now", return_value=self.friday_afternoon), patch(
+            "tim.slack_reminders.send_dm", side_effect=[SlackDeliveryError("Unavailable"), None],
+        ) as send:
+            with self.assertLogs("tim.slack_reminders", level="WARNING"):
+                self.assertEqual(self.scheduler.post(self.endpoint).status_code, 502)
+            self.assertEqual(set(SlackReminderDelivery.objects.values_list("recipient_id", flat=True)), {"UOWNER1"})
+            send.reset_mock(side_effect=True)
+            self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
+            self.assertEqual(send.call_count, 1)
+            self.assertEqual(send.call_args.kwargs["recipient"], "UADMIN2")

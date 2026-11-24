@@ -1,7 +1,7 @@
 from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import path
 from . import views
-from . import google_login, slack_reminders
+from . import google_login, slack_preferences, slack_reminders
 from .forms import TeamLogin
 
 urlpatterns = [
@@ -14,6 +14,7 @@ urlpatterns = [
     path("auth/google/return/", google_login.google_return, name="google_return"),
     path("auth/google/register/", google_login.register, name="google_register"),
     path("preferences/", views.preferences, name="preferences"),
+    path("preferences/slack/", slack_preferences.preferences, name="slack_preferences"),
     path("", views.calendar_view, name="calendar"),
     path("prijava/", LoginView.as_view(template_name="login.html", authentication_form=TeamLogin), name="login"),
     path("registracija/", views.register, name="register"),

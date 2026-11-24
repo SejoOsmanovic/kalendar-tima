@@ -16,9 +16,10 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .models import Day, SlackReminderDelivery
+from .models import Day, SlackReminderDelivery, SlackSubscription
 
 logger = logging.getLogger(__name__)
+SLACK_MEMBER_ID_PATTERN = r"^[UW][A-Z0-9]{1,31}$"
 
 CROWDED_SAMPLE_NAMES = (
     "Ari Linden",
@@ -63,12 +64,13 @@ def call_slack(method, payload):
     return result
 
 
-def send_dm(message):
-    recipient = settings.SLACK_RECIPIENT_ID
+def send_dm(message, *, recipient):
     result = call_slack("conversations.open", {"users": recipient, "return_im": True})
     channel = result.get("channel")
     if not isinstance(channel, dict) or channel.get("is_im") is not True or channel.get("user") != recipient:
         raise SlackDeliveryError("Slack did not confirm a private DM with the configured member")
+    if channel.get("is_ext_shared") or channel.get("is_org_shared"):
+        raise SlackDeliveryError("Slack returned a shared conversation")
     channel_id = channel.get("id")
     if not isinstance(channel_id, str) or not re.fullmatch(r"D[A-Z0-9]+", channel_id):
         raise SlackDeliveryError("Slack did not return a valid direct conversation ID")
@@ -96,11 +98,22 @@ def format_reminder(target, names):
     ])
 
 
-def send_next_workday_reminder(request):
+def reminder_targets():
+    subscriptions = SlackSubscription.objects.filter(enabled=True, user__is_active=True).select_related("user")
+    for subscription in subscriptions.order_by("pk"):
+        yield subscription.member_id, subscription.user
+
+    legacy = settings.SLACK_RECIPIENT_ID
+    # A linked account owns this destination even after reminders or approval access are turned off.
+    if re.fullmatch(SLACK_MEMBER_ID_PATTERN, legacy) and not SlackSubscription.objects.filter(member_id=legacy).exists():
+        yield legacy, None
+
+
+def send_next_workday_reminders(request):
     now = timezone.localtime()
     # A delayed workflow must not send a weekend or next-morning reminder.
     if now.weekday() >= 5 or now.hour < 17:
-        return
+        return True
 
     target = next_workday(now.date())
     entries = (
@@ -109,17 +122,31 @@ def send_next_workday_reminder(request):
         .select_related("worker")
         .order_by("worker__first_name", "worker__last_name", "worker__username")
     )
-    names = [row.worker.get_full_name() or row.worker.username for row in entries]
-    if not names:
-        return
-
     calendar_url = request.build_absolute_uri(reverse("calendar", query={"dan": target.isoformat()}))
-    message = f"{format_reminder(target, names)}\n\nOpen the team calendar {calendar_url}"
-    with transaction.atomic():
-        # Concurrent requests wait on the unique date. A failed Slack call rolls back the claim.
-        _, created = SlackReminderDelivery.objects.get_or_create(absence_date=target)
-        if created:
-            send_dm(message)
+    all_delivered = True
+    for recipient, user in reminder_targets():
+        # Historic rows without a recipient belong to the original configured destination.
+        if recipient == settings.SLACK_RECIPIENT_ID and SlackReminderDelivery.objects.filter(
+            absence_date=target, recipient_id="",
+        ).exists():
+            continue
+        visible_entries = entries
+        if user is not None and not user.is_staff:
+            visible_entries = entries.filter(worker__job__role__approvers=user)
+        names = [row.worker.get_full_name() or row.worker.username for row in visible_entries]
+        if not names:
+            continue
+        message = f"{format_reminder(target, names)}\n\nOpen the team calendar {calendar_url}"
+        try:
+            with transaction.atomic():
+                _, created = SlackReminderDelivery.objects.get_or_create(absence_date=target, recipient_id=recipient)
+                if created:
+                    send_dm(message, recipient=recipient)
+        except SlackDeliveryError as exc:
+            # Successful recipients keep their delivery records when the scheduler retries.
+            logger.warning("Slack reminder delivery failed. %s", exc)
+            all_delivered = False
+    return all_delivered
 
 
 @csrf_exempt
@@ -129,16 +156,19 @@ def reminder(request, sample=None):
     key = settings.SLACK_REMINDER_KEY
     if not key or not constant_time_compare(request.headers.get("Authorization", ""), f"Bearer {key}"):
         return HttpResponse(status=403)
-    if not settings.SLACK_BOT_TOKEN or not re.fullmatch(r"[UW][A-Z0-9]+", settings.SLACK_RECIPIENT_ID):
+    if not settings.SLACK_BOT_TOKEN:
         return HttpResponse(status=409)
-
+    if not sample:
+        return HttpResponse(status=204 if send_next_workday_reminders(request) else 502)
+    if not re.fullmatch(SLACK_MEMBER_ID_PATTERN, settings.SLACK_RECIPIENT_ID):
+        return HttpResponse(status=409)
     try:
-        if sample:
-            names = CROWDED_SAMPLE_NAMES if sample == "group" else ("Sample team member",)
-            message = format_reminder(next_workday(timezone.localdate()), names)
-            send_dm(f"TEST · {message}\n\nFictional team data from Scale Up Vacation Tracker.")
-        else:
-            send_next_workday_reminder(request)
+        names = CROWDED_SAMPLE_NAMES if sample == "group" else ("Sample team member",)
+        message = format_reminder(next_workday(timezone.localdate()), names)
+        send_dm(
+            f"TEST · {message}\n\nFictional team data from Scale Up Vacation Tracker.",
+            recipient=settings.SLACK_RECIPIENT_ID,
+        )
     except SlackDeliveryError as exc:
         logger.warning("Slack reminder delivery failed. %s", exc)
         return HttpResponse(status=502)

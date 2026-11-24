@@ -120,5 +120,25 @@ class AnnualAllowance(models.Model):
 
 
 class SlackReminderDelivery(models.Model):
-    absence_date = models.DateField(unique=True)
+    absence_date = models.DateField()
+    recipient_id = models.CharField(max_length=32, blank=True, default="")
     sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["absence_date", "recipient_id"], name="one_slack_reminder_per_recipient")
+        ]
+
+
+class SlackSubscription(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    member_id = models.CharField(max_length=32, unique=True)
+    enabled = models.BooleanField(default=True)
+
+
+class SlackLinkChallenge(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    member_id = models.CharField(max_length=32)
+    code_digest = models.CharField(max_length=64)
+    sent_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)

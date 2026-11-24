@@ -43,7 +43,10 @@ def preferences(request):
         DatePreference.objects.update_or_create(user=request.user, defaults={"style": form.cleaned_data["style"]})
         messages.success(request, "Your date format has been saved.")
         return redirect("calendar")
-    return render(request, "form.html", {"title": "My preferences", "button": "Save preferences", "form": form})
+    return render(request, "preferences.html", {
+        "form": form,
+        "slack_available": bool(settings.SLACK_BOT_TOKEN and settings.SLACK_REMINDER_KEY),
+    })
 
 
 def badge(request):

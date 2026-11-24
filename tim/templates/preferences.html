@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>My preferences</h1>
+<form method="post" class="panel pad narrow">
+  <h2>Calendar dates</h2>
+  {% csrf_token %}
+  {{ form.as_p }}
+  <div class="actions">
+    <button>Save preferences</button>
+    <a href="{% url 'calendar' %}">Cancel</a>
+  </div>
+</form>
+{% if can_review and slack_available %}
+<section class="panel pad narrow">
+  <h2>Slack reminders</h2>
+  <p>Receive a private message about Days off on the next workday.</p>
+  <a class="button light" href="{% url 'slack_preferences' %}">Manage Slack reminders</a>
+</section>
+{% endif %}
+{% endblock %}
