@@ -136,11 +136,12 @@ def calendar_view(request):
         days[row.date].append(row)
     cells = []
     for day in dates:
+        day_rows = days[day]
         kinds = set()
-        for row in days[day]:
+        for row in day_rows:
             show_pto = row.is_paid is True and (request.user.is_staff or row.worker_id == request.user.pk)
             kinds.add((row.badge_class, row.label, show_pto))
-        cells.append({"date": day, "kinds": sorted(kinds)})
+        cells.append({"date": day, "kinds": sorted(kinds), "away_count": len(day_rows)})
     first = selected.replace(day=1)
     return render(request, "calendar.html", {"selected": selected, "today": today, "month": MONTHS[selected.month-1],
         "prev": (first-timedelta(days=1)).replace(day=1), "next": (first+timedelta(days=32)).replace(day=1),

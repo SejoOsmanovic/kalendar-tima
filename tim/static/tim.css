@@ -11,4 +11,27 @@
 .paid-entry .absence-name{flex:1 1 5ch;min-width:0;overflow-wrap:anywhere}
 .paid-entry .pto-mark{flex:none;margin-inline-start:auto}
 
+.day-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 4px;
+}
+.day-away-count {
+  margin-inline-start: auto;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #dceee5;
+  color: #215345;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.3;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 550px) {
+  .day-heading { column-gap: 2px; }
+  .day-away-count { font-size: 10px; padding-inline: 3px; }
+}
+
 .sick{background:#d9f1ef;color:#145951}.balance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:20px 0}.balance-total{font-size:2rem;font-weight:700}.balance-total small{font-size:1rem;font-weight:400}

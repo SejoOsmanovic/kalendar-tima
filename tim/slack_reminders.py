@@ -67,14 +67,27 @@ def send_dm(message):
     })
 
 
+def next_workday(day):
+    target = day + timedelta(days=1)
+    while target.weekday() >= 5:
+        target += timedelta(days=1)
+    return target
+
+
+def format_reminder(target, names):
+    return "\n".join([
+        f"Days off on {format_date(target, 'l, F j, Y')}",
+        *(f"• {escape(' '.join(name.split()), quote=False)}" for name in names),
+    ])
+
+
 def send_next_workday_reminder(request):
     now = timezone.localtime()
-    weekday = now.weekday()
     # A delayed workflow must not send a weekend or next-morning reminder.
-    if weekday >= 5 or now.hour < 17:
+    if now.weekday() >= 5 or now.hour < 17:
         return
 
-    target = now.date() + timedelta(days=3 if weekday == 4 else 1)
+    target = next_workday(now.date())
     entries = (
         Day.objects.filter(date=target, kind__in=("free", "vacation"), worker__is_active=True)
         .filter(Q(source__isnull=True) | Q(source__status="approved"))
@@ -86,12 +99,7 @@ def send_next_workday_reminder(request):
         return
 
     calendar_url = request.build_absolute_uri(reverse("calendar", query={"dan": target.isoformat()}))
-    message = "\n".join([
-        f"Days off on {format_date(target, 'l, F j, Y')}",
-        *(f"• {escape(' '.join(name.split()), quote=False)}" for name in names),
-        "",
-        f"Open the team calendar {calendar_url}",
-    ])
+    message = f"{format_reminder(target, names)}\n\nOpen the team calendar {calendar_url}"
     with transaction.atomic():
         # Concurrent requests wait on the unique date. A failed Slack call rolls back the claim.
         _, created = SlackReminderDelivery.objects.get_or_create(absence_date=target)
@@ -111,10 +119,8 @@ def reminder(request, test_message=False):
 
     try:
         if test_message:
-            send_dm(
-                "Test from Scale Up Vacation Tracker. Your days-off reminders reach this private chat. "
-                "Friday reminders cover Monday."
-            )
+            sample = format_reminder(next_workday(timezone.localdate()), ["Sample team member"])
+            send_dm(f"TEST · {sample}\n\nSample reminder from Scale Up Vacation Tracker.")
         else:
             send_next_workday_reminder(request)
     except SlackDeliveryError as exc:

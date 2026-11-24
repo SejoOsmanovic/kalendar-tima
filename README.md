@@ -111,7 +111,7 @@ The **Slack days off reminder** GitHub workflow runs at 17:05 in Europe/Sarajevo
 4. In GitHub under **Settings → Secrets and variables → Actions**, save the same trigger key as a repository secret called `SLACK_REMINDER_KEY`. Use the dashboards for both secrets.
 5. Open **Actions → Slack days off reminder → Run workflow**. Confirm that the test message reaches your own Slack DM. Then add the GitHub Actions repository variable `SLACK_REMINDERS_ENABLED` with the value `true` to start scheduled delivery. Delete that variable or set it to `false` to pause the schedule.
 
-The test run sends a fixed message without accessing employee entries. GitHub Actions can start late during busy periods. Failed requests appear in the workflow logs and Slack delivery errors appear in the Render service logs.
+The test run uses a fictional absence on the next weekday so you can preview the reminder in your Slack DM. GitHub Actions can start late during busy periods. Failed requests appear in the workflow logs and Slack delivery errors appear in the Render service logs.
 
 ## Running checks
 

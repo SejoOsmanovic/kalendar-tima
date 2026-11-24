@@ -105,9 +105,11 @@ class SlackReminderTests(TestCase):
 
     def test_manual_test_has_no_employee_data_and_does_not_mark_delivery(self):
         self.add_day("private-employee-name", "free")
-        self.assertEqual(self.scheduler.post(self.test_endpoint).status_code, 204)
+        with patch("tim.slack_reminders.timezone.now", return_value=self.friday_afternoon):
+            self.assertEqual(self.scheduler.post(self.test_endpoint).status_code, 204)
         payload = self.slack.call_args.kwargs["json"]
-        self.assertIn("Test from Scale Up Vacation Tracker", payload["text"])
+        self.assertIn("TEST · Days off on Monday, November 30, 2026", payload["text"])
+        self.assertIn("Sample team member", payload["text"])
         self.assertNotIn("private-employee-name", payload["text"])
         self.assertFalse(SlackReminderDelivery.objects.exists())
 
