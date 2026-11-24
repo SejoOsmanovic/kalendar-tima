@@ -36,6 +36,7 @@ class SlackPreferencesTests(TestCase):
         subscription = SlackSubscription.objects.get(user=self.lead)
         self.assertEqual(subscription.member_id, "ULEAD1")
         self.assertTrue(subscription.enabled)
+        self.assertFalse(subscription.team_overview)
         self.assertFalse(SlackLinkChallenge.objects.exists())
         self.client.post(self.url, {"action": "disable"})
         subscription.refresh_from_db()
@@ -54,15 +55,39 @@ class SlackPreferencesTests(TestCase):
         self.client.post(self.url, {"action": "verify_code", "code": code})
         self.assertFalse(SlackSubscription.objects.exists())
 
-    def test_connection_is_not_available_without_approval_access_or_csrf(self):
-        member = User.objects.create_user("ordinary")
-        self.client.force_login(member)
-        self.assertEqual(self.client.get(self.url).status_code, 403)
-        self.assertEqual(self.client.post(self.url, {"action": "send_code", "member_id": "ULEAD1"}).status_code, 403)
+    def test_connection_requires_csrf(self):
         protected = Client(enforce_csrf_checks=True)
         protected.force_login(self.lead)
         self.assertEqual(protected.post(self.url, {"action": "send_code", "member_id": "ULEAD1"}).status_code, 403)
         self.send.assert_not_called()
+
+    def test_registered_member_can_connect_after_access_is_approved(self):
+        self.client.logout()
+        role = JobRole.objects.get(name="Media Buyer")
+        registered = self.client.post(reverse("register"), {
+            "name": "Test teammate",
+            "email": "teammate@example.test",
+            "password": "a-test-only-password",
+            "job_role": role.pk,
+        }, follow=True)
+        self.assertContains(registered, "You can then connect Slack from My preferences.")
+        member = User.objects.get(email="teammate@example.test")
+        self.assertFalse(member.is_active)
+        self.client.force_login(member)
+        self.assertEqual(self.client.post(self.url, {"action": "send_code", "member_id": "UTEAM1"}).status_code, 302)
+        self.send.assert_not_called()
+
+        admin = User.objects.create_user("owner", is_staff=True)
+        self.client.force_login(admin)
+        self.client.post(reverse("approve_member", args=[member.pk]))
+        member.refresh_from_db()
+        self.assertTrue(member.is_active)
+        self.client.force_login(member)
+        self.assertContains(self.client.get(reverse("preferences")), "Manage Slack reminders")
+        self.client.post(self.url, {"action": "send_code", "member_id": "UTEAM1"})
+        code = re.search(r"code is ([0-9]{8})", self.send.call_args.args[0])[1]
+        self.assertRedirects(self.client.post(self.url, {"action": "verify_code", "code": code}), self.url)
+        self.assertTrue(SlackSubscription.objects.get(user=member).team_overview)
 
     def test_expired_code_cannot_link(self):
         self.client.post(self.url, {"action": "send_code", "member_id": "ULEAD1"})

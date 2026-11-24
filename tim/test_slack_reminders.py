@@ -156,8 +156,11 @@ class SlackReminderTests(TestCase):
         full_admin = User.objects.create_user("owner", is_staff=True)
         editor_lead = User.objects.create_user("editor-lead")
         worker = User.objects.create_user("ordinary-member")
-        for user, member_id in [(full_admin, "UOWNER1"), (editor_lead, "ULEAD1"), (worker, "UWORKER1")]:
-            SlackSubscription.objects.create(user=user, member_id=member_id)
+        former_lead = User.objects.create_user("former-lead")
+        SlackSubscription.objects.create(user=full_admin, member_id="UOWNER1")
+        SlackSubscription.objects.create(user=editor_lead, member_id="ULEAD1")
+        SlackSubscription.objects.create(user=worker, member_id="UWORKER1", team_overview=True)
+        SlackSubscription.objects.create(user=former_lead, member_id="UFORMER1")
 
         editor_role = JobRole.objects.get(name="Video Editor")
         buyer_role = JobRole.objects.get(name="Media Buyer")
@@ -174,10 +177,12 @@ class SlackReminderTests(TestCase):
                 self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
                 self.assertEqual(self.scheduler.post(self.endpoint).status_code, 204)
             summaries = {call.kwargs["recipient"]: call.args[0] for call in send.call_args_list}
-            self.assertEqual(send.call_count, 2)
-            self.assertEqual(set(summaries), {"UOWNER1", "ULEAD1"})
+            self.assertEqual(send.call_count, 3)
+            self.assertEqual(set(summaries), {"UOWNER1", "ULEAD1", "UWORKER1"})
             self.assertIn("Video editor", summaries["UOWNER1"])
             self.assertIn("Media buyer", summaries["UOWNER1"])
+            self.assertIn("Video editor", summaries["UWORKER1"])
+            self.assertIn("Media buyer", summaries["UWORKER1"])
             self.assertIn("Video editor", summaries["ULEAD1"])
             self.assertNotIn("Media buyer", summaries["ULEAD1"])
 

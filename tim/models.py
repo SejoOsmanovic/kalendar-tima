@@ -134,6 +134,7 @@ class SlackSubscription(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     member_id = models.CharField(max_length=32, unique=True)
     enabled = models.BooleanField(default=True)
+    team_overview = models.BooleanField(default=False)
 
 
 class SlackLinkChallenge(models.Model):

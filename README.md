@@ -113,7 +113,7 @@ The **Slack days off reminder** GitHub workflow runs at 17:05 in Europe/Sarajevo
 
 The test run uses a fictional absence on the next weekday so you can preview the reminder in your Slack DM. GitHub Actions can start late during busy periods. Failed requests appear in the workflow logs and Slack delivery errors appear in the Render service logs.
 
-Full administrators and members with approval permissions can connect their Slack account in **My preferences → Slack reminders**. Copy the Slack member ID from your profile and confirm the code sent by the bot. Full administrators receive the whole team's Days off. Team leads receive Days off for the job roles assigned to them in **Approval permissions**. The schedule checks current permissions for each send.
+Approved members can connect their Slack account in **My preferences → Slack reminders**. Copy the Slack member ID from your profile and confirm the code sent by the bot. Full administrators and team members who opt in to the team overview receive the whole team's Days off. Team leads receive Days off only for the job roles assigned to them in **Approval permissions**. When a role-only subscriber loses approval access, they can explicitly turn on the team overview in their preferences.
 
 The original recipient from `SLACK_RECIPIENT_ID` can connect the same Slack profile to apply their current app permissions to that destination. A connected profile's pause switch applies to that destination, including the original receiver. The same bot and GitHub workflow serve every connected account.
 

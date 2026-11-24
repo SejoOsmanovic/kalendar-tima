@@ -3,19 +3,19 @@
 <p><a href="{% url 'preferences' %}">← My preferences</a></p>
 <h1>Slack reminders</h1>
 <section class="panel pad narrow">
-  {% if user.is_staff %}
-    <p>Your reminders cover Days off for the entire team.</p>
-  {% else %}
+  {% if roles %}
     <p>Your reminders cover Days off for <strong>{{ roles|join:", " }}</strong>.</p>
+  {% else %}
+    <p>Your reminders cover Days off for the entire team.</p>
   {% endif %}
   {% if not configured %}
     <p>Slack reminders are unavailable. Ask an administrator to finish the Slack setup.</p>
   {% elif subscription %}
     <p>Connected Slack member ID <strong>{{ subscription.member_id }}</strong></p>
-    <p>Reminders are {% if subscription.enabled %}on{% else %}paused{% endif %}.</p>
+    <p>Reminders are {% if receiving_reminders %}on{% else %}paused{% endif %}.</p>
     <form method="post">
       {% csrf_token %}
-      {% if subscription.enabled %}
+      {% if receiving_reminders %}
         <button name="action" value="disable" class="light">Pause reminders</button>
       {% else %}
         <button name="action" value="enable">Turn on reminders</button>

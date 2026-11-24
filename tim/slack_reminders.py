@@ -101,12 +101,12 @@ def format_reminder(target, names):
 def reminder_targets():
     subscriptions = SlackSubscription.objects.filter(enabled=True, user__is_active=True).select_related("user")
     for subscription in subscriptions.order_by("pk"):
-        yield subscription.member_id, subscription.user
+        yield subscription.member_id, subscription.user, subscription.team_overview
 
     legacy = settings.SLACK_RECIPIENT_ID
     # A linked account owns this destination even after reminders or approval access are turned off.
     if re.fullmatch(SLACK_MEMBER_ID_PATTERN, legacy) and not SlackSubscription.objects.filter(member_id=legacy).exists():
-        yield legacy, None
+        yield legacy, None, True
 
 
 def send_next_workday_reminders(request):
@@ -124,7 +124,7 @@ def send_next_workday_reminders(request):
     )
     calendar_url = request.build_absolute_uri(reverse("calendar", query={"dan": target.isoformat()}))
     all_delivered = True
-    for recipient, user in reminder_targets():
+    for recipient, user, team_overview in reminder_targets():
         # Historic rows without a recipient belong to the original configured destination.
         if recipient == settings.SLACK_RECIPIENT_ID and SlackReminderDelivery.objects.filter(
             absence_date=target, recipient_id="",
@@ -132,7 +132,12 @@ def send_next_workday_reminders(request):
             continue
         visible_entries = entries
         if user is not None and not user.is_staff:
-            visible_entries = entries.filter(worker__job__role__approvers=user)
+            role_ids = list(user.approval_roles.values_list("pk", flat=True))
+            if role_ids:
+                visible_entries = entries.filter(worker__job__role_id__in=role_ids)
+            elif not team_overview:
+                # Losing an approval role cannot silently widen an existing subscription.
+                continue
         names = [row.worker.get_full_name() or row.worker.username for row in visible_entries]
         if not names:
             continue

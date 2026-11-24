@@ -90,7 +90,11 @@ def finish_link(user, code):
 
     try:
         with transaction.atomic():
-            SlackSubscription.objects.create(user=user, member_id=challenge.member_id)
+            SlackSubscription.objects.create(
+                user=user,
+                member_id=challenge.member_id,
+                team_overview=not user.is_staff and not user.approval_roles.exists(),
+            )
     except IntegrityError:
         return "This Slack account is already connected."
     challenge.delete()
@@ -103,7 +107,7 @@ def finish_link(user, code):
 def preferences(request):
     user = request.user
     roles = [] if user.is_staff else list(user.approval_roles.values_list("name", flat=True))
-    if not user.is_active or (not user.is_staff and not roles):
+    if not user.is_active:
         raise PermissionDenied
 
     configured = bool(settings.SLACK_BOT_TOKEN and settings.SLACK_REMINDER_KEY)
@@ -118,7 +122,9 @@ def preferences(request):
             if action not in ("enable", "disable"):
                 return HttpResponseBadRequest("Choose whether to receive Slack reminders.")
             subscription.enabled = action == "enable"
-            subscription.save(update_fields=["enabled"])
+            if subscription.enabled and not user.is_staff and not roles:
+                subscription.team_overview = True
+            subscription.save(update_fields=["enabled", "team_overview"])
             messages.success(request, "Slack reminders turned on." if subscription.enabled else "Slack reminders paused.")
             return redirect("slack_preferences")
         if action == "send_code":
@@ -148,6 +154,9 @@ def preferences(request):
     return render(request, "slack_preferences.html", {
         "configured": configured,
         "subscription": subscription,
+        "receiving_reminders": bool(
+            subscription and subscription.enabled and (user.is_staff or roles or subscription.team_overview)
+        ),
         "roles": roles,
         "member_form": member_form,
         "code_form": code_form,

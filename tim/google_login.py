@@ -91,7 +91,10 @@ def register(request):
         except IntegrityError:
             messages.info(request, "This account already exists. Return to sign in.")
         else:
-            messages.success(request, "Registration submitted. Once approved, sign in with Google.")
+            notice = "Registration submitted. Once approved, sign in with Google."
+            if settings.SLACK_BOT_TOKEN and settings.SLACK_REMINDER_KEY:
+                notice += " You can then connect Slack from My preferences."
+            messages.success(request, notice)
         request.session.pop("google_signup", None)
         return redirect("login")
     return render(request, "form.html", {"title": "Complete your registration", "form": form,

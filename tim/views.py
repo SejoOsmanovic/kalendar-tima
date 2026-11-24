@@ -416,7 +416,10 @@ def register(request):
         except IntegrityError:
             form.add_error("email", "This email address is already in use.")
         else:
-            messages.success(request, "Registration submitted. Once an administrator approves your account, sign in with your email and password.")
+            notice = "Registration submitted. Once an administrator approves your account, sign in with your email and password."
+            if settings.SLACK_BOT_TOKEN and settings.SLACK_REMINDER_KEY:
+                notice += " You can then connect Slack from My preferences."
+            messages.success(request, notice)
             return redirect("login")
     return render(request, "form.html", {"form": form, "title": "Register", "button": "Request access"})
 
