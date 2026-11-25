@@ -125,6 +125,47 @@ class SlackReminderTests(TestCase):
         self.assertNotIn("private-employee-name", group_text)
         self.assertFalse(SlackReminderDelivery.objects.exists())
 
+    def test_admin_sends_a_sample_to_only_the_selected_linked_member(self):
+        admin = User.objects.create_user("admin", is_staff=True)
+        target = User.objects.create_user("lea", first_name="Léa", last_name="Đurić")
+        other = self.add_day("another-member", "free", date(2026, 11, 26)).worker
+        SlackSubscription.objects.create(user=target, member_id="UTARGET1")
+        SlackSubscription.objects.create(user=other, member_id="UOTHER1")
+        self.client.force_login(admin)
+        endpoint = reverse("send_member_slack_test", args=[target.pk])
+        self.assertContains(self.client.get(reverse("team")), f'action="{endpoint}"')
+
+        wednesday = datetime(2026, 11, 25, 10, tzinfo=timezone.utc)
+        with patch("tim.slack_reminders.timezone.now", return_value=wednesday), patch(
+            "tim.slack_reminders.send_dm",
+        ) as send:
+            response = self.client.post(endpoint, follow=True)
+
+        self.assertContains(response, "Slack test sent to Léa Đurić.")
+        send.assert_called_once_with(
+            "TEST · Days off on Thursday, November 26, 2026\n"
+            "• Léa Đurić\n\nSample reminder from Scale Up Vacation Tracker.",
+            recipient="UTARGET1",
+        )
+        self.assertFalse(Day.objects.filter(worker=target).exists())
+        self.assertFalse(SlackReminderDelivery.objects.exists())
+
+    def test_member_slack_test_requires_a_full_admin_and_enabled_subscription(self):
+        administrator = User.objects.create_user("admin", is_staff=True)
+        lead = User.objects.create_user("lead")
+        JobRole.objects.get(name="Video Editor").approvers.add(lead)
+        target = User.objects.create_user("member")
+        SlackSubscription.objects.create(user=target, member_id="UTARGET1", enabled=False)
+        endpoint = reverse("send_member_slack_test", args=[target.pk])
+
+        self.client.force_login(lead)
+        self.assertEqual(self.client.post(endpoint).status_code, 403)
+        self.client.force_login(administrator)
+        self.assertEqual(self.client.get(endpoint).status_code, 405)
+        self.assertEqual(self.client.post(endpoint).status_code, 404)
+        self.assertNotContains(self.client.get(reverse("team")), f'action="{endpoint}"')
+        self.slack.assert_not_called()
+
     def test_mismatched_dm_is_rejected(self):
         response = Mock()
         response.json.return_value = {

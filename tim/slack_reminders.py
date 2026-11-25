@@ -98,6 +98,16 @@ def format_reminder(target, names):
     ])
 
 
+def send_test_reminder(recipient, names, *, footer="Fictional team data from Scale Up Vacation Tracker."):
+    message = format_reminder(next_workday(timezone.localdate()), names)
+    try:
+        send_dm(f"TEST · {message}\n\n{footer}", recipient=recipient)
+    except SlackDeliveryError as exc:
+        logger.warning("Slack test reminder delivery failed. %s", exc)
+        return False
+    return True
+
+
 def reminder_targets():
     subscriptions = SlackSubscription.objects.filter(enabled=True, user__is_active=True).select_related("user")
     for subscription in subscriptions.order_by("pk"):
@@ -167,14 +177,5 @@ def reminder(request, sample=None):
         return HttpResponse(status=204 if send_next_workday_reminders(request) else 502)
     if not re.fullmatch(SLACK_MEMBER_ID_PATTERN, settings.SLACK_RECIPIENT_ID):
         return HttpResponse(status=409)
-    try:
-        names = CROWDED_SAMPLE_NAMES if sample == "group" else ("Sample team member",)
-        message = format_reminder(next_workday(timezone.localdate()), names)
-        send_dm(
-            f"TEST · {message}\n\nFictional team data from Scale Up Vacation Tracker.",
-            recipient=settings.SLACK_RECIPIENT_ID,
-        )
-    except SlackDeliveryError as exc:
-        logger.warning("Slack reminder delivery failed. %s", exc)
-        return HttpResponse(status=502)
-    return HttpResponse(status=204)
+    names = CROWDED_SAMPLE_NAMES if sample == "group" else ("Sample team member",)
+    return HttpResponse(status=204 if send_test_reminder(settings.SLACK_RECIPIENT_ID, names) else 502)

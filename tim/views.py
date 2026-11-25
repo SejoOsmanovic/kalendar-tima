@@ -17,9 +17,10 @@ from django.views.decorators.http import require_POST
 
 from .forms import Ask, Entry, Member, Registration, RoleSelection, ApprovalScope, DateSettings
 from .models import Day, KINDS, LeaveRequest, PendingRegistration, JobRole, MemberRole, EntryType, DatePreference
-from .models import AnnualAllowance
+from .models import AnnualAllowance, SlackSubscription
 from .forms import AllowanceSettings
 from .balances import balances
+from .slack_reminders import send_test_reminder
 
 MONTHS = "January February March April May June July August September October November December".split()
 
@@ -336,7 +337,27 @@ def team(request):
             return redirect("team")
     return render(request, "team.html", {"form": form, "roles": JobRole.objects.all(), "colors": JobRole.COLORS,
         "registrations": PendingRegistration.objects.select_related("user__job__role").order_by("pk"),
-        "members": User.objects.filter(pending_registration__isnull=True).select_related("job__role").prefetch_related("approval_roles").order_by("-is_active","first_name","username")})
+        "slack_available": bool(settings.SLACK_BOT_TOKEN and settings.SLACK_REMINDER_KEY),
+        "members": User.objects.filter(pending_registration__isnull=True).select_related("job__role", "slacksubscription").prefetch_related("approval_roles").order_by("-is_active","first_name","username")})
+
+
+@admin
+@require_POST
+def send_member_slack_test(request, pk):
+    if not settings.SLACK_BOT_TOKEN or not settings.SLACK_REMINDER_KEY:
+        return HttpResponseBadRequest("Slack reminders are unavailable.")
+    subscription = get_object_or_404(
+        SlackSubscription.objects.select_related("user"),
+        user_id=pk, user__is_active=True, user__pending_registration__isnull=True, enabled=True,
+    )
+    member_name = name(subscription.user)
+    if send_test_reminder(
+        subscription.member_id, (member_name,), footer="Sample reminder from Scale Up Vacation Tracker.",
+    ):
+        messages.success(request, f"Slack test sent to {member_name}.")
+    else:
+        messages.error(request, f"Slack did not confirm delivery of the test to {member_name}.")
+    return redirect("team")
 
 
 @admin

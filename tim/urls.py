@@ -32,6 +32,7 @@ urlpatterns = [
     path("zahtjevi/<int:pk>/odluka/", views.decide, name="decide"),
     path("tim/", views.team, name="team"),
     path("tim/pending-count/", views.registration_count, name="registration_count"),
+    path("tim/<int:pk>/slack-test/", views.send_member_slack_test, name="send_member_slack_test"),
     path("tim/<int:pk>/approval-roles/", views.approval_scope, name="approval_scope"),
     path("tim/role/", views.add_role, name="add_role"),
     path("tim/role/<int:pk>/color/", views.role_color, name="role_color"),
